@@ -1,58 +1,88 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import dotenv from 'dotenv';
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import dotenv from "dotenv";
 
-import { authRouter } from './modules/auth/auth.routes';
-import { tasksRouter } from './modules/tasks/tasks.routes';
-import { projectsRouter } from './modules/projects/projects.routes';
-import { tagsRouter } from './modules/tags/tags.routes';
-import { habitsRouter } from './modules/habits/habits.routes';
-import { goalsRouter } from './modules/goals/goals.routes';
-import { focusRouter } from './modules/focus/focus.routes';
-import { smartListsRouter } from './modules/smart-lists/smart-lists.routes';
-import { aiRouter } from './modules/ai/ai.routes';
-import { exportRouter } from './modules/export/export.routes';
-import { birthdaysRouter } from './modules/birthdays/birthdays.routes';
-import { graphRouter } from './modules/graph.routes';
-import { errorHandler } from './common/middleware/error-handler';
-import { authMiddleware } from './common/middleware/auth';
+import { authRouter } from "./modules/auth/auth.routes";
+import { tasksRouter } from "./modules/tasks/tasks.routes";
+import { projectsRouter } from "./modules/projects/projects.routes";
+import { tagsRouter } from "./modules/tags/tags.routes";
+import { habitsRouter } from "./modules/habits/habits.routes";
+import { goalsRouter } from "./modules/goals/goals.routes";
+import { focusRouter } from "./modules/focus/focus.routes";
+import { smartListsRouter } from "./modules/smart-lists/smart-lists.routes";
+import { aiRouter } from "./modules/ai/ai.routes";
+import { exportRouter } from "./modules/export/export.routes";
+import { birthdaysRouter } from "./modules/birthdays/birthdays.routes";
+import { graphRouter } from "./modules/graph.routes";
+import { errorHandler } from "./common/middleware/error-handler";
+import { authMiddleware } from "./common/middleware/auth";
 
 dotenv.config();
 
 const app = express();
-const configuredOrigins = (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000')
-  .split(',')
+
+const configuredOrigins = [
+  ...(process.env.CORS_ORIGIN || "").split(","),
+  ...(process.env.FRONTEND_URL || "").split(","),
+
+  // Production
+  "https://task-flow-axion.vercel.app",
+  "https://task-flow-wheat-sigma.vercel.app",
+
+  // Local development
+  "http://localhost:3000",
+  "http://localhost:5173",
+]
   .map((value) => value.trim())
   .filter(Boolean);
 
-const corsOrigin = (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
-  if (!origin || configuredOrigins.includes(origin)) {
+const allowedOrigins = new Set(configuredOrigins);
+
+const corsOrigin = (
+  origin: string | undefined,
+  callback: (error: Error | null, allow?: boolean) => void,
+) => {
+  // Разрешаем запросы без Origin (например, health checks/server-to-server).
+  if (!origin) {
     callback(null, true);
     return;
   }
+
+  if (allowedOrigins.has(origin)) {
+    callback(null, true);
+    return;
+  }
+
   callback(null, false);
 };
 
 const httpServer = createServer(app);
+
 const io = new Server(httpServer, {
   cors: {
     origin: corsOrigin,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   },
 });
 
 const PORT = process.env.PORT || 3001;
 
 app.use(helmet());
-app.use(cors({
-  origin: corsOrigin,
-  credentials: true,
-}));
-app.use(express.json({ limit: '10mb' }));
+
+app.use(
+  cors({
+    origin: corsOrigin,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  }),
+);
+
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 const limiter = rateLimit({
@@ -61,44 +91,49 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
 app.use(limiter);
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get("/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  });
 });
 
-app.use('/auth', authRouter);
-app.use('/tasks', authMiddleware, tasksRouter);
-app.use('/projects', authMiddleware, projectsRouter);
-app.use('/tags', authMiddleware, tagsRouter);
-app.use('/habits', authMiddleware, habitsRouter);
-app.use('/goals', authMiddleware, goalsRouter);
-app.use('/focus', authMiddleware, focusRouter);
-app.use('/smart-lists', authMiddleware, smartListsRouter);
-app.use('/ai', authMiddleware, aiRouter);
-app.use('/export', authMiddleware, exportRouter);
-app.use('/birthdays', authMiddleware, birthdaysRouter);
-app.use('/graph', authMiddleware, graphRouter);
+app.use("/auth", authRouter);
+
+app.use("/tasks", authMiddleware, tasksRouter);
+app.use("/projects", authMiddleware, projectsRouter);
+app.use("/tags", authMiddleware, tagsRouter);
+app.use("/habits", authMiddleware, habitsRouter);
+app.use("/goals", authMiddleware, goalsRouter);
+app.use("/focus", authMiddleware, focusRouter);
+app.use("/smart-lists", authMiddleware, smartListsRouter);
+app.use("/ai", authMiddleware, aiRouter);
+app.use("/export", authMiddleware, exportRouter);
+app.use("/birthdays", authMiddleware, birthdaysRouter);
+app.use("/graph", authMiddleware, graphRouter);
 
 app.use(errorHandler);
 
-io.on('connection', (socket) => {
+io.on("connection", (socket) => {
   console.log(`Client connected: ${socket.id}`);
 
-  socket.on('join:user', (userId: string) => {
+  socket.on("join:user", (userId: string) => {
     socket.join(`user:${userId}`);
   });
 
-  socket.on('join:project', (projectId: string) => {
+  socket.on("join:project", (projectId: string) => {
     socket.join(`project:${projectId}`);
   });
 
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     console.log(`Client disconnected: ${socket.id}`);
   });
 });
 
-app.set('io', io);
+app.set("io", io);
 
 if (!process.env.VERCEL) {
   httpServer.listen(PORT, () => {
