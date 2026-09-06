@@ -25,11 +25,20 @@ dotenv.config();
 
 const app = express();
 
+/**
+ * CORS
+ *
+ * Основной production frontend:
+ * https://task-flow-axsion.vercel.app
+ *
+ * Также оставляем старые/локальные адреса для совместимости.
+ */
 const configuredOrigins = [
   ...(process.env.CORS_ORIGIN || "").split(","),
   ...(process.env.FRONTEND_URL || "").split(","),
 
   // Production
+  "https://task-flow-axsion.vercel.app",
   "https://task-flow-axion.vercel.app",
   "https://task-flow-wheat-sigma.vercel.app",
 
@@ -46,7 +55,8 @@ const corsOrigin = (
   origin: string | undefined,
   callback: (error: Error | null, allow?: boolean) => void,
 ) => {
-  // Разрешаем запросы без Origin (например, health checks/server-to-server).
+  // Разрешаем запросы без Origin:
+  // health checks, server-to-server и т.д.
   if (!origin) {
     callback(null, true);
     return;
@@ -58,6 +68,14 @@ const corsOrigin = (
   }
 
   callback(null, false);
+};
+
+const corsOptions = {
+  origin: corsOrigin,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204,
 };
 
 const httpServer = createServer(app);
@@ -74,13 +92,10 @@ const PORT = process.env.PORT || 3001;
 
 app.use(helmet());
 
-app.use(
-  cors({
-    origin: corsOrigin,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  }),
-);
+app.use(cors(corsOptions));
+
+// Явно обрабатываем CORS preflight OPTIONS-запросы.
+app.options("*", cors(corsOptions));
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
