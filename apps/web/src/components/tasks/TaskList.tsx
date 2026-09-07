@@ -18,6 +18,8 @@ import { ProfileView } from '@/components/views/ProfileView';
 import { BirthdaysView } from '@/components/views/BirthdaysView';
 import { GraphView } from '@/components/views/GraphView';
 import { TodayDashboard } from '@/components/views/TodayDashboard';
+import { TomorrowView } from '@/components/views/TomorrowView';
+import { WeekView } from '@/components/views/WeekView';
 import { Loader2, List, Columns3, Grid2x2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
@@ -191,8 +193,10 @@ export function TaskList() {
       </header>
 
       {displayMode === 'list' && currentView === 'today' && <TodayDashboard />}
+      {displayMode === 'list' && currentView === 'tomorrow' && <TomorrowView />}
+      {displayMode === 'list' && currentView === 'week' && <WeekView />}
 
-      {displayMode === 'list' && currentView !== 'today' && (
+      {displayMode === 'list' && currentView !== 'today' && currentView !== 'tomorrow' && currentView !== 'week' && (
         <div className="flex-1 overflow-y-auto px-4 py-3">
           <div data-tour="add-task"><QuickAdd /></div>
 
