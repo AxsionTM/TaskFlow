@@ -108,12 +108,15 @@ export function TaskDetail() {
   }, [loadTask]);
 
   // Описание растет вместе с текстом вместо 3 строк со скроллом.
+  // task/loading в зависимостях: при повторном открытии той же задачи
+  // description не меняется, и без этого ресайз не перезапускается,
+  // а поле монтируется маленьким (баг из графа).
   useEffect(() => {
     const el = descRef.current;
-    if (!el) return;
+    if (!el || loading || !task) return;
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 400) + 'px';
-  }, [description, selectedTaskId]);
+  }, [description, selectedTaskId, task, loading]);
 
   useEffect(() => {
     api.getTags().then(({ tags: t }) => setTags(t)).catch(() => {});
