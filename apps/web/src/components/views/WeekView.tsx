@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { useTasksStore } from '@/stores/tasks';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { plural } from '@/components/views/TomorrowView';
-import { tagLabel } from '@/lib/tags';
+import { TagIcon } from '@/components/tasks/TagIcon';
 
 interface DayGroup {
   key: string;
@@ -41,13 +41,14 @@ export function WeekView() {
   const ring = 2 * Math.PI * 52;
 
   const tagStats = useMemo(() => {
-    const map = new Map<string, { name: string; color: string; done: number; total: number }>();
+    const map = new Map<string, { name: string; color: string; icon?: string | null; done: number; total: number }>();
     for (const t of tasks as any[]) {
       const tags = t.tags?.length ? t.tags : [{ tag: { name: t.project?.name || 'Без тега', color: t.project?.color || '#888888' } }];
       for (const tt of tags) {
-        const name = tagLabel(tt.tag) || 'Без тега';
+        const name = tt.tag?.name || 'Без тега';
         const color = tt.tag?.color || '#888888';
-        if (!map.has(name)) map.set(name, { name, color, done: 0, total: 0 });
+        const icon = tt.tag?.icon || null;
+        if (!map.has(name)) map.set(name, { name, color, icon, done: 0, total: 0 });
         const entry = map.get(name)!;
         entry.total += 1;
         if (t.status === 'COMPLETED') entry.done += 1;
@@ -135,7 +136,10 @@ export function WeekView() {
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: s.color, boxShadow: `0 0 8px -1px ${s.color}` }}
                     />
-                    <span className="flex-1 min-w-0 truncate text-xs">{s.name}</span>
+                    <span className="flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
+                      <TagIcon icon={s.icon} />
+                      {s.name}
+                    </span>
                     <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-full rounded-full"

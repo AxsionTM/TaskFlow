@@ -6,7 +6,7 @@ import { useTasksStore } from '@/stores/tasks';
 import { useHabitsStore } from '@/stores/habits';
 import { useGoalsStore } from '@/stores/goals';
 import { useFocusStore } from '@/stores/focus';
-import { TaskItem } from '@/components/tasks/TaskItem';
+import { TaskCard } from '@/components/tasks/TaskCard';
 import { CreateTaskModal } from '@/components/tasks/CreateTaskModal';
 import { Loader2 } from 'lucide-react';
 
@@ -145,7 +145,7 @@ export function TodayDashboard() {
             ) : (
               <div className="mt-1 divide-y divide-[hsl(var(--primary)/0.14)]">
                 {todayTasks.map((task) => (
-                  <TaskItem key={task.id} task={task} />
+                  <TaskCard key={task.id} task={task} flat />
                 ))}
               </div>
             )}

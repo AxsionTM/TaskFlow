@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { formatDate, cn } from '@/lib/utils';
 import { Trash2, RotateCcw, Loader2, Clock3 } from 'lucide-react';
 import { plural } from '@/components/views/TomorrowView';
-import { tagLabel } from '@/lib/tags';
+import { TagPill } from '@/components/tasks/TagPill';
 
 const CHIPS = [
   { id: 'all', label: 'Все' },
@@ -169,18 +169,7 @@ export function TrashView() {
                           {task.title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          {task.tags?.[0] && (
-                            <span
-                              className="tf-tag"
-                              style={{
-                                border: `1px solid ${color}99`,
-                                color,
-                                backgroundColor: `${color}1f`,
-                              }}
-                            >
-                              {tagLabel(task.tags[0].tag)}
-                            </span>
-                          )}
+                          {task.tags?.[0] && <TagPill tag={task.tags[0].tag} />}
                           {task.dueDate && (
                             <span className="text-[11px] text-muted-foreground">
                               {formatDate(task.dueDate)}

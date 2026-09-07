@@ -2,23 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import {
-  Calendar,
+  CalendarClock,
   CalendarDays,
+  CalendarCheck,
+  CalendarRange,
   ChevronDown,
   ChevronRight,
   Folder,
   Inbox,
-  LayoutList,
   Plus,
   Settings,
-  Sun,
   Target,
   Timer,
-  Repeat,
   Search,
   LogOut,
-  Moon,
-  AlertCircle,
   Download,
   X,
   Trash2,
@@ -26,6 +23,9 @@ import {
   Activity,
   Sparkles,
   Network,
+  AlarmClock,
+  Flame,
+  Gift,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
 import { useProjectsStore } from '@/stores/projects';
@@ -42,11 +42,11 @@ import { SearchDialog } from './SearchDialog';
 import { api } from '@/lib/api';
 
 const smartViews = [
-  { id: 'today', label: 'Сегодня', icon: Sun },
-  { id: 'tomorrow', label: 'Завтра', icon: Calendar },
+  { id: 'today', label: 'Сегодня', icon: CalendarCheck },
+  { id: 'tomorrow', label: 'Завтра', icon: CalendarClock },
   { id: 'agenda', label: 'Повестка дня', icon: ListTodo },
-  { id: 'week', label: 'На этой неделе', icon: LayoutList },
-  { id: 'overdue', label: 'Просроченные', icon: AlertCircle },
+  { id: 'week', label: 'На этой неделе', icon: CalendarRange },
+  { id: 'overdue', label: 'Просроченные', icon: AlarmClock },
   { id: 'calendar', label: 'Календарь', icon: CalendarDays },
 ];
 
@@ -313,7 +313,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                   : 'text-foreground hover:bg-accent'
               )}
             >
-              <Repeat className="h-4 w-4" />
+              <Flame className="h-4 w-4" />
               Привычки
             </button>
             <button
@@ -369,7 +369,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                   : 'text-foreground hover:bg-accent'
               )}
             >
-              <span className="text-sm">🎂</span>
+              <Gift className="h-4 w-4" />
               Дни рождения
             </button>
             <button

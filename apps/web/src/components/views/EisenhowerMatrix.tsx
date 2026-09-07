@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatDate, cn } from '@/lib/utils';
-import { tagLabel } from '@/lib/tags';
+import { TagPill } from '@/components/tasks/TagPill';
 import { Calendar } from 'lucide-react';
 
 type Quadrant = 'do' | 'schedule' | 'delegate' | 'eliminate';
@@ -112,15 +112,8 @@ function MatrixCard({ task }: { task: any }) {
           {task.title}
         </p>
         {task.tags?.[0] && (
-          <span
-            className="tf-tag mt-1 inline-block"
-            style={{
-              border: `1px solid ${(task.tags[0].tag?.color || '#888888')}cc`,
-              color: task.tags[0].tag?.color || '#888888',
-              backgroundColor: `${task.tags[0].tag?.color || '#888888'}26`,
-            }}
-          >
-            {tagLabel(task.tags[0].tag)}
+          <span className="mt-1 inline-block">
+            <TagPill tag={task.tags[0].tag} />
           </span>
         )}
         {task.dueDate && (

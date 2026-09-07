@@ -7,12 +7,12 @@ import { AuthRequest } from '../../common/middleware/auth';
 const router = Router();
 
 const DEFAULT_TAGS = [
-  { name: 'Работа', color: '#ef4444', icon: '💼' },
-  { name: 'Здоровье', color: '#22c55e', icon: '💪' },
-  { name: 'Личное', color: '#a855f7', icon: '🔮' },
-  { name: 'Развитие', color: '#3b82f6', icon: '🌱' },
-  { name: 'Быт', color: '#f59e0b', icon: '🏠' },
-  { name: 'Дом', color: '#ec4899', icon: '🏡' },
+  { name: 'Работа', color: '#ef4444', icon: 'briefcase' },
+  { name: 'Здоровье', color: '#22c55e', icon: 'dumbbell' },
+  { name: 'Личное', color: '#a855f7', icon: 'sparkles' },
+  { name: 'Развитие', color: '#3b82f6', icon: 'sprout' },
+  { name: 'Быт', color: '#f59e0b', icon: 'shopping-cart' },
+  { name: 'Дом', color: '#ec4899', icon: 'home' },
 ];
 
 const TAG_PALETTE = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#22d3ee', '#fb7185'];
@@ -46,7 +46,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
       .object({
         name: z.string().min(1),
         color: z.string().optional(),
-        icon: z.string().max(8).optional().nullable(),
+        icon: z.string().max(32).optional().nullable(),
       })
       .parse(req.body);
 

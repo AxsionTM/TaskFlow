@@ -8,7 +8,8 @@ import { useTasksStore } from '@/stores/tasks';
 import { useProjectsStore } from '@/stores/projects';
 import { api } from '@/lib/api';
 import { cn, priorityLabels } from '@/lib/utils';
-import { TAG_COLORS, TAG_ICONS, randomTagColor, tagLabel } from '@/lib/tags';
+import { TAG_COLORS, TAG_ICONS, randomTagColor } from '@/lib/tags';
+import { TagIcon } from '@/components/tasks/TagIcon';
 
 const PRIORITIES = [
   { value: 'NONE', label: 'Нет', color: 'text-emerald-500', bg: 'bg-emerald-600' },
@@ -394,7 +395,10 @@ export function CreateTaskModal({ open, onClose }: Props) {
                         : undefined
                     }
                   >
-                    {tagLabel(tag)}
+                    <span className="inline-flex items-center gap-1">
+                      <TagIcon icon={tag.icon} />
+                      {tag.name}
+                    </span>
                   </button>
                 );
               })}
@@ -404,9 +408,9 @@ export function CreateTaskModal({ open, onClose }: Props) {
                 type="button"
                 onClick={() => setNewTagIcon(newTagIcon ? '' : TAG_ICONS[0])}
                 title="Иконка тега"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-input bg-card text-base"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-input bg-card text-muted-foreground"
               >
-                {newTagIcon || '🙂'}
+                {newTagIcon ? <TagIcon icon={newTagIcon} className="h-4 w-4" /> : <TagIcon icon="tag" className="h-4 w-4" />}
               </button>
               <span
                 className="h-8 w-8 shrink-0 rounded-full border-2"
@@ -440,14 +444,15 @@ export function CreateTaskModal({ open, onClose }: Props) {
                     key={icon}
                     type="button"
                     onClick={() => setNewTagIcon(icon)}
+                    title={icon}
                     className={cn(
-                      'flex h-7 items-center justify-center rounded-md border text-base transition-all',
+                      'flex h-7 items-center justify-center rounded-md border text-muted-foreground transition-all',
                       newTagIcon === icon
-                        ? 'border-primary bg-primary/15 scale-110'
+                        ? 'border-primary bg-primary/15 scale-110 text-primary'
                         : 'border-border hover:border-primary/50'
                     )}
                   >
-                    {icon}
+                    <TagIcon icon={icon} className="h-4 w-4" />
                   </button>
                 ))}
               </div>

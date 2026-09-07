@@ -2,8 +2,9 @@
 
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { tagLabel } from '@/lib/tags';
+import { TagPill } from '@/components/tasks/TagPill';
 
 export const PRIORITY_TINT: Record<string, string> = {
   HIGH: '#ef4444',
@@ -20,26 +21,63 @@ export function taskTimeLabel(task: any): string {
   return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function TaskCard({ task }: { task: any }) {
+export function TaskCard({
+  task,
+  flat,
+  ringColor,
+}: {
+  task: any;
+  flat?: boolean;
+  ringColor?: string;
+}) {
   const { setSelectedTask, completeTask } = useTasksStore();
   const color =
-    task.tags?.[0]?.tag?.color || task.project?.color || PRIORITY_TINT[task.priority || 'NONE'] || '#888888';
-  const tagName = task.tags?.[0]?.tag ? tagLabel(task.tags[0].tag) : task.project?.name || '';
+    ringColor ||
+    task.tags?.[0]?.tag?.color ||
+    task.project?.color ||
+    PRIORITY_TINT[task.priority || 'NONE'] ||
+    '#888888';
+  const tag = task.tags?.[0]?.tag || null;
+  const tagName = tag ? tag.name : task.project?.name || '';
   const letter = (task.title || '?').trim().slice(0, 1).toUpperCase();
+  const checked = task.status === 'COMPLETED';
 
   return (
     <div
       onClick={() => setSelectedTask(task.id)}
-      className="tf-glass rounded-2xl px-3.5 py-3 flex items-center gap-3 cursor-pointer transition-transform hover:scale-[1.005]"
+      className={cn(
+        'px-3.5 py-3 flex items-center gap-3 cursor-pointer transition-transform hover:scale-[1.005]',
+        flat ? 'rounded-none' : 'tf-glass rounded-2xl'
+      )}
     >
-      <div
-        onClick={(e) => {
-          e.stopPropagation();
-          completeTask(task.id);
-        }}
-      >
-        <Checkbox checked={task.status === 'COMPLETED'} priority={task.priority} className="tf-check-glow" />
-      </div>
+      {ringColor ? (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={checked}
+          onClick={(e) => {
+            e.stopPropagation();
+            completeTask(task.id);
+          }}
+          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 bg-transparent"
+          style={{
+            borderColor: ringColor,
+            color: ringColor,
+            boxShadow: `0 0 12px -2px ${ringColor}`,
+          }}
+        >
+          {checked && <Check className="h-3.5 w-3.5" strokeWidth={3.5} />}
+        </button>
+      ) : (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            completeTask(task.id);
+          }}
+        >
+          <Checkbox checked={checked} priority={task.priority} ghost size="md" className="tf-check-glow" />
+        </div>
+      )}
       <span
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold"
         style={{
@@ -55,24 +93,14 @@ export function TaskCard({ task }: { task: any }) {
         <span
           className={cn(
             'block truncate text-[15px] font-medium',
-            task.status === 'COMPLETED' && 'line-through text-muted-foreground'
+            checked && 'line-through text-muted-foreground'
           )}
         >
           {task.title}
         </span>
         {tagName && (
-          <span
-            className="tf-tag mt-1 inline-block"
-            style={{
-              border: `1px solid ${color}cc`,
-              color,
-              backgroundColor: `${color}26`,
-              boxShadow: `0 0 14px -2px ${color}aa, inset 0 0 8px -4px ${color}66`,
-              textShadow: `0 0 8px ${color}88`,
-              fontWeight: 600,
-            }}
-          >
-            {tagName}
+          <span className="mt-1 inline-block">
+            <TagPill tag={tag || { name: tagName, color: task.project?.color }} />
           </span>
         )}
       </span>

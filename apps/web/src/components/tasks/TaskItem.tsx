@@ -3,7 +3,7 @@
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn, formatDate } from '@/lib/utils';
-import { tagLabel } from '@/lib/tags';
+import { TagPill } from '@/components/tasks/TagPill';
 import { Calendar, Flag } from 'lucide-react';
 
 const FLAG_COLOR: Record<string, string> = {
@@ -102,25 +102,9 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
                   : `${contextualDateLabel}${timeLabel ? ` · ${timeLabel}` : ''}`}
               </span>
             )}
-            {task.tags?.map((tt: any) => {
-              const color = tt.tag?.color || '#888888';
-              return (
-                <span
-                  key={tt.tag?.id || tt.tagId}
-                  className="tf-tag"
-                style={{
-                  border: `1px solid ${color}cc`,
-                  color,
-                  backgroundColor: `${color}26`,
-                  boxShadow: `0 0 14px -2px ${color}aa, inset 0 0 8px -4px ${color}66`,
-                  textShadow: `0 0 8px ${color}88`,
-                  fontWeight: 600,
-                }}
-                >
-                {tagLabel(tt.tag)}
-              </span>
-              );
-            })}
+            {task.tags?.map((tt: any) => (
+              <TagPill key={tt.tag?.id || tt.tagId} tag={tt.tag} />
+            ))}
             {task.project && (
               <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                 <span

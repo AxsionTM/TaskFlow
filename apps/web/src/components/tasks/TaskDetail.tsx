@@ -25,7 +25,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn, formatDate, priorityLabels } from '@/lib/utils';
-import { TAG_COLORS, TAG_ICONS, randomTagColor, tagLabel } from '@/lib/tags';
+import { TAG_COLORS, TAG_ICONS, randomTagColor } from '@/lib/tags';
+import { TagIcon } from '@/components/tasks/TagIcon';
 
 const PRIORITIES = [
   { value: 'NONE', label: 'Нет', color: 'bg-emerald-600' },
@@ -600,7 +601,10 @@ const handleDueDateChange = (value: string) => {
                         : 'border-border text-muted-foreground hover:border-primary/50'
                     )}
                   >
-                    {tagLabel(tag)}
+                    <span className="inline-flex items-center gap-1">
+                      <TagIcon icon={tag.icon} />
+                      {tag.name}
+                    </span>
                   </button>
                 );
               })}
@@ -611,9 +615,9 @@ const handleDueDateChange = (value: string) => {
                       type="button"
                       onClick={() => setNewTagIcon(newTagIcon ? '' : TAG_ICONS[0])}
                       title="Иконка тега"
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-input text-sm"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-input text-muted-foreground"
                     >
-                      {newTagIcon || '🙂'}
+                      {newTagIcon ? <TagIcon icon={newTagIcon} /> : <TagIcon icon="tag" />}
                     </button>
                     <Input
                       value={newTagName}
@@ -638,13 +642,13 @@ const handleDueDateChange = (value: string) => {
                           type="button"
                           onClick={() => setNewTagIcon(icon)}
                           className={cn(
-                            'flex h-6 items-center justify-center rounded border text-sm',
+                            'flex h-6 items-center justify-center rounded border text-muted-foreground',
                             newTagIcon === icon
-                              ? 'border-primary bg-primary/15'
+                              ? 'border-primary bg-primary/15 text-primary'
                               : 'border-border hover:border-primary/50'
                           )}
                         >
-                          {icon}
+                          <TagIcon icon={icon} />
                         </button>
                       ))}
                     </div>

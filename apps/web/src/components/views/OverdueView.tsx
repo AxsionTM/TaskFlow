@@ -58,7 +58,7 @@ export function OverdueView() {
         ) : (
           <div className="tf-glass rounded-2xl p-3 space-y-2 mb-4">
             {overdueTasks.map((task: any) => (
-              <TaskCard key={task.id} task={task} />
+              <TaskCard key={task.id} task={task} ringColor="#ef4444" />
             ))}
           </div>
         )}

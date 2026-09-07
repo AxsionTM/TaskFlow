@@ -9,18 +9,39 @@ export const TAG_COLORS = [
   '#fb7185',
 ];
 
+/** Ключи lucide-иконок для тегов (контурные, без эмодзи) */
 export const TAG_ICONS = [
-  '💼', '💪', '🔮', '🌱', '🏠', '🏡', '📚', '🎯',
-  '💡', '❤️', '⭐', '🔥', '🎨', '💰', '✈️', '🎵',
-  '📝', '💻', '🏃', '🍎', '📞', '🎬', '🛒', '📌',
+  'briefcase',
+  'dumbbell',
+  'sparkles',
+  'sprout',
+  'home',
+  'shopping-cart',
+  'book',
+  'target',
+  'lightbulb',
+  'star',
+  'flame',
+  'heart',
+  'music',
+  'coffee',
+  'car',
+  'plane',
+  'gift',
+  'palette',
+  'camera',
+  'code',
+  'trophy',
+  'rocket',
+  'bell',
+  'tag',
 ];
 
 export function randomTagColor(): string {
   return TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)];
 }
 
-/** "🔮 Личное" — иконка + название везде одинаково */
-export function tagLabel(tag: { name?: string; icon?: string | null } | null | undefined): string {
-  if (!tag) return '';
-  return `${tag.icon ? `${tag.icon} ` : ''}${tag.name || ''}`.trim();
+/** Название тега без иконки (иконка рисуется компонентом TagIcon) */
+export function tagLabel(tag: { name?: string } | null | undefined): string {
+  return tag?.name || '';
 }
