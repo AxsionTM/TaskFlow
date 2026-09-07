@@ -45,9 +45,9 @@ interface TasksState {
 
   displayMode: DisplayMode;
 
-  fetchTasks: (params?: Record<string, string>) => Promise<void>;
-  fetchToday: () => Promise<void>;
-  fetchOverdue: () => Promise<void>;
+  fetchTasks: (params?: Record<string, string>, opts?: { silent?: boolean }) => Promise<void>;
+  fetchToday: (opts?: { silent?: boolean }) => Promise<void>;
+  fetchOverdue: (opts?: { silent?: boolean }) => Promise<void>;
 
   createTask: (data: any) => Promise<Task>;
 
@@ -65,7 +65,38 @@ interface TasksState {
 
   setDisplayMode: (mode: DisplayMode) => void;
 
-  refreshCurrentView: () => Promise<void>;
+  refreshCurrentView: (opts?: { silent?: boolean }) => Promise<void>;
+}
+
+function dayBounds() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+function matchesTodayFilter(task: Task): boolean {
+  if (!task || task.parentId) return false;
+  if (task.status === 'COMPLETED') {
+    if (!task.completedAt) return true;
+    const { start, end } = dayBounds();
+    const completed = new Date(task.completedAt).getTime();
+    return completed >= start.getTime() && completed <= end.getTime();
+  }
+  if (!task.startDate && !task.dueDate) return false;
+  const { start, end } = dayBounds();
+  if (task.startDate && new Date(task.startDate).getTime() > end.getTime()) return false;
+  if (task.dueDate && new Date(task.dueDate).getTime() < start.getTime()) return false;
+  return true;
+}
+
+function matchesOverdueFilter(task: Task): boolean {
+  if (!task || task.parentId) return false;
+  if (task.status === 'COMPLETED') return false;
+  if (!task.dueDate) return false;
+  const { start } = dayBounds();
+  return new Date(task.dueDate).getTime() < start.getTime();
 }
 
 export const useTasksStore = create<TasksState>((set, get) => ({
@@ -83,8 +114,9 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
   displayMode: "list",
 
-  fetchTasks: async (params) => {
-    set({ isLoading: true });
+  fetchTasks: async (params, opts) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) set({ isLoading: true });
 
     try {
       const query = { ...params };
@@ -97,8 +129,9 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
       set({
         tasks,
-        isLoading: false,
+        ...(silent ? {} : { isLoading: false }),
       });
+      if (silent) set({ isLoading: false });
     } catch {
       set({
         isLoading: false,
@@ -106,8 +139,9 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     }
   },
 
-  fetchToday: async () => {
-    set({ isLoading: true });
+  fetchToday: async (opts) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) set({ isLoading: true });
 
     try {
       const { tasks } = await api.getTodayTasks();
@@ -123,7 +157,8 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     }
   },
 
-  fetchOverdue: async () => {
+  fetchOverdue: async (opts) => {
+    void opts;
     try {
       const { tasks } = await api.getOverdueTasks();
 
@@ -133,7 +168,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     } catch {}
   },
 
-  refreshCurrentView: async () => {
+  refreshCurrentView: async (opts) => {
     const {
       currentView,
       currentProjectId,
@@ -142,6 +177,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       fetchOverdue,
       fetchTasks,
     } = get();
+    const silent = Boolean(opts?.silent);
 
     const includeCompleted =
       displayMode === "kanban" ||
@@ -152,15 +188,18 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
     // Calendar always shows all open tasks for the month (not only today)
     if (displayMode === "calendar") {
-      await fetchTasks({
-        includeCompleted: "true",
-      });
+      await fetchTasks(
+        {
+          includeCompleted: "true",
+        },
+        { silent }
+      );
 
       return;
     }
 
     if (currentView === "today") {
-      await fetchToday();
+      await fetchToday({ silent });
 
       const { todayTasks } = get();
 
@@ -168,7 +207,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         tasks: todayTasks,
       });
     } else if (currentView === "overdue") {
-      await fetchOverdue();
+      await fetchOverdue({ silent });
 
       const { overdueTasks } = get();
 
@@ -176,15 +215,21 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         tasks: overdueTasks,
       });
     } else if (currentView === "inbox") {
-      await fetchTasks({
-        inbox: "true",
-        includeCompleted: "false",
-      });
+      await fetchTasks(
+        {
+          inbox: "true",
+          includeCompleted: "false",
+        },
+        { silent }
+      );
     } else if (currentView === "project" && currentProjectId) {
-      await fetchTasks({
-        projectId: currentProjectId,
-        includeCompleted: includeCompleted || "false",
-      });
+      await fetchTasks(
+        {
+          projectId: currentProjectId,
+          includeCompleted: includeCompleted || "false",
+        },
+        { silent }
+      );
     } else if (currentView === "tomorrow") {
       const tomorrow = new Date();
 
@@ -198,11 +243,14 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
       end.setHours(23, 59, 59, 999);
 
-      await fetchTasks({
-        dueAfter: start.toISOString(),
-        dueBefore: end.toISOString(),
-        includeCompleted: includeCompleted || "false",
-      });
+      await fetchTasks(
+        {
+          dueAfter: start.toISOString(),
+          dueBefore: end.toISOString(),
+          includeCompleted: includeCompleted || "false",
+        },
+        { silent }
+      );
     } else if (currentView === "week") {
       const start = new Date();
 
@@ -214,36 +262,50 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
       end.setHours(23, 59, 59, 999);
 
-      await fetchTasks({
-        dueAfter: start.toISOString(),
-        dueBefore: end.toISOString(),
-        includeCompleted: "true",
-      });
+      await fetchTasks(
+        {
+          dueAfter: start.toISOString(),
+          dueBefore: end.toISOString(),
+          includeCompleted: "true",
+        },
+        { silent }
+      );
     } else {
-      await fetchTasks({
-        includeCompleted: includeCompleted || "false",
-      });
+      await fetchTasks(
+        {
+          includeCompleted: includeCompleted || "false",
+        },
+        { silent }
+      );
     }
   },
 
   createTask: async (data) => {
     const { task } = await api.createTask(data);
 
-    // Update the visible UI immediately. The server refresh happens in the
-    // background so creating a task does not feel like the app is frozen.
-    set((state) => {
-      const addIfMissing = (items: Task[]) =>
-        items.some((item) => item.id === task.id)
-          ? items
-          : [task, ...items];
+    // Мгновенный optimistic-update: задача видна сразу на ПК и mobile,
+    // без перезагрузки. Подзадачи (parentId) не кладем в корневые списки.
+    if (!task.parentId) {
+      set((state) => {
+        const addIfMissing = (items: Task[]) =>
+          items.some((item) => item.id === task.id) ? items : [task, ...items];
 
-      return {
-        tasks: addIfMissing(state.tasks),
-        todayTasks: addIfMissing(state.todayTasks),
-      };
-    });
+        return {
+          tasks: addIfMissing(state.tasks),
+          todayTasks: matchesTodayFilter(task as Task)
+            ? addIfMissing(state.todayTasks)
+            : state.todayTasks,
+          overdueTasks: matchesOverdueFilter(task as Task)
+            ? addIfMissing(state.overdueTasks)
+            : state.overdueTasks,
+        };
+      });
+    }
 
-    void get().refreshCurrentView();
+    // Тихая сверка с сервером: без isLoading-спиннера, который раньше
+    // прятал список и создавал ощущение "не появилось до перезагрузки".
+    // await, а не void — иначе фоновый fetch с кэшем затирал optimistic.
+    await get().refreshCurrentView({ silent: true }).catch(() => {});
     return task;
   },
 
@@ -251,12 +313,12 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     const { task } = await api.updateTask(id, data);
 
     set((state) => ({
-      tasks: state.tasks.map((item) => item.id === id ? { ...item, ...task } : item),
-      todayTasks: state.todayTasks.map((item) => item.id === id ? { ...item, ...task } : item),
-      overdueTasks: state.overdueTasks.map((item) => item.id === id ? { ...item, ...task } : item),
+      tasks: state.tasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
+      todayTasks: state.todayTasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
+      overdueTasks: state.overdueTasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
     }));
 
-    void get().refreshCurrentView();
+    await get().refreshCurrentView({ silent: true }).catch(() => {});
   },
 
   completeTask: async (id) => {
@@ -264,12 +326,12 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     const completed = task || { id, status: 'COMPLETED' };
 
     set((state) => ({
-      tasks: state.tasks.map((item) => item.id === id ? { ...item, ...completed } : item),
-      todayTasks: state.todayTasks.map((item) => item.id === id ? { ...item, ...completed } : item),
+      tasks: state.tasks.map((item) => (item.id === id ? { ...item, ...completed } : item)),
+      todayTasks: state.todayTasks.map((item) => (item.id === id ? { ...item, ...completed } : item)),
       overdueTasks: state.overdueTasks.filter((item) => item.id !== id),
     }));
 
-    void get().refreshCurrentView();
+    await get().refreshCurrentView({ silent: true }).catch(() => {});
   },
 
   deleteTask: async (id) => {
@@ -284,7 +346,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       selectedTaskId: selectedTaskId === id ? null : selectedTaskId,
     }));
 
-    void get().refreshCurrentView();
+    await get().refreshCurrentView({ silent: true }).catch(() => {});
   },
 
   setSelectedTask: (id) =>
@@ -308,6 +370,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       displayMode: mode,
     });
 
-    setTimeout(() => get().refreshCurrentView(), 0);
+    setTimeout(() => get().refreshCurrentView({ silent: true }).catch(() => {}), 0);
   },
 }));

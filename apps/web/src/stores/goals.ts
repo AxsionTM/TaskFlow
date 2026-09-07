@@ -38,17 +38,30 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
 
   createGoal: async (data) => {
     const { goal } = await api.createGoal(data);
-    await get().fetchGoals();
+    set((state) => ({ goals: [goal, ...state.goals] }));
+    await get().fetchGoals().catch(() => {});
     return goal;
   },
 
   updateGoal: async (id, data) => {
-    await api.updateGoal(id, data);
-    await get().fetchGoals();
+    set((state) => ({ goals: state.goals.map((g) => (g.id === id ? { ...g, ...data } : g)) }));
+    try {
+      await api.updateGoal(id, data);
+    } catch (e) {
+      await get().fetchGoals().catch(() => {});
+      throw e;
+    }
+    await get().fetchGoals().catch(() => {});
   },
 
   deleteGoal: async (id) => {
-    await api.deleteGoal(id);
-    await get().fetchGoals();
+    set((state) => ({ goals: state.goals.filter((g) => g.id !== id) }));
+    try {
+      await api.deleteGoal(id);
+    } catch (e) {
+      await get().fetchGoals().catch(() => {});
+      throw e;
+    }
+    await get().fetchGoals().catch(() => {});
   },
 }));

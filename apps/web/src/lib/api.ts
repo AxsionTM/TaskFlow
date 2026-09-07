@@ -39,7 +39,9 @@ class ApiClient {
 
     let res: Response;
     try {
-      res = await fetch(`${API_URL}${path}`, { ...options, headers });
+      // no-store: без этого браузер / Vercel CDN могут отдать закэшированный
+      // GET /tasks и новая задача не появится до жёсткой перезагрузки.
+      res = await fetch(`${API_URL}${path}`, { ...options, headers, cache: 'no-store' });
     } catch {
       throw new ApiError('Не удалось подключиться к серверу', 0);
     }

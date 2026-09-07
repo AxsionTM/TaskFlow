@@ -58,11 +58,18 @@ export const useBirthdaysStore = create<State>((set, get) => ({
     }
   },
   create: async (data) => {
-    await api.createBirthday(data);
-    await get().fetch();
+    const { birthday } = await api.createBirthday(data);
+    if (birthday) set((state) => ({ items: [birthday, ...state.items] }));
+    await get().fetch().catch(() => {});
   },
   remove: async (id) => {
-    await api.deleteBirthday(id);
-    await get().fetch();
+    set((state) => ({ items: state.items.filter((b) => b.id !== id) }));
+    try {
+      await api.deleteBirthday(id);
+    } catch (e) {
+      await get().fetch().catch(() => {});
+      throw e;
+    }
+    await get().fetch().catch(() => {});
   },
 }));
