@@ -66,7 +66,8 @@ export function FocusView() {
       </header>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-md mx-auto px-4 py-8 flex flex-col items-center">
+        <div className="mx-auto max-w-6xl px-4 py-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_330px] items-start">
+        <div className="tf-glass rounded-3xl px-4 py-8 flex flex-col items-center min-w-0">
           {/* Mode label */}
           <div
             className={cn(
@@ -192,23 +193,25 @@ export function FocusView() {
             </div>
           )}
 
-          {/* Recent sessions */}
-          {sessions.length > 0 && (
-            <div className="w-full mt-8">
-              <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
-                <Timer className="h-4 w-4 text-muted-foreground" />
-                Недавние сессии
-              </h3>
+          </div>
+        {/* Right column: recent sessions + quote, как в дизайне */}
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="tf-glass rounded-3xl p-4">
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
+              <Timer className="h-4 w-4 text-muted-foreground" />
+              Последние сессии
+            </h3>
+            {sessions.length > 0 ? (
               <div className="space-y-1.5">
                 {sessions.slice(0, 8).map((s: any, index: number) => {
                   const dot = SESSION_DOT_COLORS[index % SESSION_DOT_COLORS.length];
                   return (
                     <div
                       key={s.id}
-                      className="tf-glass flex items-center gap-3 text-sm px-3 py-2 rounded-xl"
+                      className="flex items-center gap-3 text-sm px-3 py-2 rounded-xl border border-border/50 bg-card/40"
                     >
                       <span
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm"
                         style={{
                           color: dot,
                           border: `1.5px solid ${dot}`,
@@ -218,21 +221,40 @@ export function FocusView() {
                       >
                         🍅
                       </span>
-                      <span className="text-muted-foreground">
-                        {new Date(s.startedAt).toLocaleDateString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">
+                          {new Date(s.startedAt).toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'long',
+                          })}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {s.durationMin} мин ·{' '}
+                          {new Date(s.startedAt).toLocaleDateString('ru-RU', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
                       </span>
-                      <span className="ml-auto font-medium">{s.durationMin} мин</span>
                     </div>
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-muted-foreground px-1 py-2">
+                Пока нет сессий — запустите первый помидор 🍅
+              </p>
+            )}
+          </div>
+          <div className="tf-glass rounded-3xl p-4 flex items-center gap-3">
+            <span className="text-3xl shrink-0" role="img" aria-label="Росток">
+              🌱
+            </span>
+            <p className="text-sm font-medium leading-snug">
+              Маленькие шаги создают большие результаты!
+            </p>
+          </div>
+        </div>
         </div>
       </div>
     </div>
