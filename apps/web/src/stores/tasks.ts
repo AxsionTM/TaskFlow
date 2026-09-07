@@ -99,6 +99,46 @@ function matchesOverdueFilter(task: Task): boolean {
   return new Date(task.dueDate).getTime() < start.getTime();
 }
 
+// Свежие мутации: GET сразу после POST/DELETE на Vercel может вернуть
+// stale-список (serverless cold start / lag / гонка фоновых refresh).
+// Держим их 15 секунд и подмешиваем в ответы, чтобы тихая сверка
+// не стирала только что созданное и не возвращала удаленное.
+const MUTATION_TTL_MS = 15000;
+const recentMutations = new Map<string, { task: Task | null; ts: number }>();
+
+function rememberMutation(id: string, task: Task | null) {
+  recentMutations.set(id, { task, ts: Date.now() });
+}
+
+function mergeFreshInto(list: Task[], gate?: (task: Task) => boolean): Task[] {
+  const now = Date.now();
+  let result = list;
+  for (const [id, entry] of recentMutations) {
+    if (now - entry.ts > MUTATION_TTL_MS) {
+      recentMutations.delete(id);
+      continue;
+    }
+    const pending = entry.task;
+    if (pending === null) {
+      if (result.some((item) => item.id === id)) {
+        result = result.filter((item) => item.id !== id);
+      }
+      continue;
+    }
+    if (pending.parentId) continue;
+    if (gate && !gate(pending)) continue;
+    const index = result.findIndex((item) => item.id === id);
+    if (index >= 0) {
+      const next = [...result];
+      next[index] = pending;
+      result = next;
+    } else {
+      result = [pending, ...result];
+    }
+  }
+  return result;
+}
+
 export const useTasksStore = create<TasksState>((set, get) => ({
   tasks: [],
   todayTasks: [],
@@ -128,7 +168,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       const { tasks } = await api.getTasks(query);
 
       set({
-        tasks,
+        tasks: mergeFreshInto(tasks as Task[]),
         ...(silent ? {} : { isLoading: false }),
       });
       if (silent) set({ isLoading: false });
@@ -147,7 +187,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       const { tasks } = await api.getTodayTasks();
 
       set({
-        todayTasks: tasks,
+        todayTasks: mergeFreshInto(tasks as Task[], matchesTodayFilter),
         isLoading: false,
       });
     } catch {
@@ -163,7 +203,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       const { tasks } = await api.getOverdueTasks();
 
       set({
-        overdueTasks: tasks,
+        overdueTasks: mergeFreshInto(tasks as Task[], matchesOverdueFilter),
       });
     } catch {}
   },
@@ -311,6 +351,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
     try {
       const { task } = await api.createTask(data);
+      rememberMutation(task.id, task as Task);
 
       if (!task.parentId) {
         // Меняем временную карточку на настоящую с сервера.
@@ -359,6 +400,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
     try {
       const { task } = await api.updateTask(id, data);
+      rememberMutation(task.id, task as Task);
       set((state) => ({
         tasks: state.tasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
         todayTasks: state.todayTasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
@@ -392,6 +434,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     try {
       const { task } = await api.completeTask(id);
       const completed = task || { id, status: optimisticStatus };
+      rememberMutation(id, completed as Task);
       set((state) => ({
         tasks: state.tasks.map((item) => (item.id === id ? { ...item, ...completed } : item)),
         todayTasks: state.todayTasks.map((item) => (item.id === id ? { ...item, ...completed } : item)),
@@ -419,6 +462,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
     try {
       await api.deleteTask(id);
+      rememberMutation(id, null);
     } catch (e) {
       // Откат, если сервер отклонил удаление (например CORS/сеть на Vercel).
       set(snap);

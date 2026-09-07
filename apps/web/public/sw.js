@@ -1,4 +1,4 @@
-const CACHE = 'taskflow-v2';
+const CACHE = 'taskflow-v3';
 const ASSETS = ['/', '/login', '/register', '/app'];
 
 self.addEventListener('install', (event) => {
@@ -18,6 +18,32 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
+
+  // Никогда не кэшируем API: на проде web и api — разные origins
+  // (3 отдельных Vercel-проекта), и старый cache-first для API отдает
+  // stale-список без только что созданной задачи.
+  try {
+    const url = new URL(request.url);
+    if (url.origin !== self.location.origin) return;
+    if (
+      url.pathname.startsWith('/tasks') ||
+      url.pathname.startsWith('/projects') ||
+      url.pathname.startsWith('/habits') ||
+      url.pathname.startsWith('/goals') ||
+      url.pathname.startsWith('/birthdays') ||
+      url.pathname.startsWith('/focus') ||
+      url.pathname.startsWith('/tags') ||
+      url.pathname.startsWith('/graph') ||
+      url.pathname.startsWith('/auth') ||
+      url.pathname.startsWith('/export') ||
+      url.pathname.startsWith('/smart-lists') ||
+      url.pathname.startsWith('/ai')
+    ) {
+      return;
+    }
+  } catch {
+    return;
+  }
 
   // Network-first for API
   if (request.url.includes(':3001') || request.url.includes('/api/')) {
