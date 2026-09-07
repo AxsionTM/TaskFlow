@@ -50,7 +50,7 @@ function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
       style={style}
       onClick={() => setSelectedTask(task.id)}
       className={cn(
-        'rounded-lg border bg-card p-3 cursor-pointer shadow-sm hover:shadow transition-shadow',
+        'rounded-xl tf-glass p-3 cursor-pointer shadow-sm hover:shadow transition-shadow',
         isSelected && 'ring-2 ring-primary/40'
       )}
     >
@@ -70,7 +70,7 @@ function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
             completeTask(task.id);
           }}
         >
-          <Checkbox checked={task.status === 'COMPLETED'} priority={task.priority} />
+          <Checkbox checked={task.status === 'COMPLETED'} priority={task.priority} ghost size="sm" className="tf-check-glow" />
         </div>
         <div className="flex-1 min-w-0">
           <p
@@ -95,11 +95,24 @@ function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
               {formatDate(task.dueDate)}
             </span>
           )}
+          {task.tags?.[0] && (
+            <span
+              className="tf-tag mt-1.5 inline-block"
+              style={{
+                border: `1px solid ${(task.tags[0].tag?.color || '#888888')}cc`,
+                color: task.tags[0].tag?.color || '#888888',
+                backgroundColor: `${task.tags[0].tag?.color || '#888888'}26`,
+                boxShadow: `0 0 12px -3px ${(task.tags[0].tag?.color || '#888888')}aa`,
+              }}
+            >
+              {task.tags[0].tag?.name}
+            </span>
+          )}
           {task.project && (
             <div className="flex items-center gap-1 mt-1.5">
               <span
                 className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: task.project.color }}
+                style={{ backgroundColor: task.project.color, boxShadow: `0 0 8px -1px ${task.project.color}` }}
               />
               <span className="text-xs text-muted-foreground truncate">
                 {task.project.name}
@@ -126,7 +139,7 @@ function Column({
   return (
     <div
       className={cn(
-        'w-72 flex flex-col rounded-xl border bg-muted/30 border-t-4',
+        'w-72 flex flex-col rounded-2xl tf-glass border-t-4',
         col.color,
         isOver && 'ring-2 ring-primary/30'
       )}

@@ -27,6 +27,16 @@ export function BirthdaysView() {
     setRemindDays(0);
   };
 
+  const daysUntil = (iso: string): number => {
+    const now = new Date();
+    const d = new Date(iso);
+    const next = new Date(now.getFullYear(), d.getMonth(), d.getDate());
+    if (next.getTime() < new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) {
+      next.setFullYear(now.getFullYear() + 1);
+    }
+    return Math.round((next.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6 max-w-2xl mx-auto w-full">
       <div className="flex items-center gap-2 mb-4">
@@ -34,12 +44,12 @@ export function BirthdaysView() {
         <div>
           <h1 className="text-lg font-semibold">Дни рождения</h1>
           <p className="text-xs text-muted-foreground">
-            Родственники и близкие. В календаре — особая ячейка. Напоминание в браузере в этот день.
+            Ближайшие события
           </p>
         </div>
       </div>
 
-      <form onSubmit={submit} className="rounded-xl border bg-card p-4 space-y-3 mb-6">
+      <form onSubmit={submit} className="tf-glass rounded-2xl p-4 space-y-3 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <Input placeholder="Имя" value={name} onChange={(e) => setName(e.target.value)} />
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -57,38 +67,52 @@ export function BirthdaysView() {
             <option value={3}>За 3 дня</option>
             <option value={7}>За 7 дней</option>
           </select>
-          <Button type="submit" size="sm" className="ml-auto gap-1">
+          <Button type="submit" size="sm" className="tf-btn-violet ml-auto gap-1">
             <Plus className="h-4 w-4" /> Добавить
           </Button>
         </div>
       </form>
 
       {loading && <p className="text-sm text-muted-foreground">Загрузка…</p>}
-      <div className="space-y-2">
+      <div className="tf-glass rounded-2xl p-3 space-y-2">
         {items.map((b) => {
           const age = ageFromDate(b.date);
           const d = new Date(b.date);
+          const left = daysUntil(b.date);
+          const initials = b.name
+            .split(' ')
+            .map((p) => p[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase();
           return (
             <div
               key={b.id}
-              className="flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5"
+              className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/40 px-3 py-2.5"
             >
-              <div className="h-10 w-10 rounded-full bg-primary/15 flex items-center justify-center text-lg">
-                🎂
+              <div
+                className="h-11 w-11 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                style={{
+                  background: 'linear-gradient(135deg, hsl(var(--primary)), var(--tf-accent2))',
+                  boxShadow: '0 0 14px -3px var(--tf-glow)',
+                }}
+              >
+                {initials}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">
-                  {b.name}{' '}
-                  <span className="text-muted-foreground font-normal">({age} лет)</span>
-                </p>
+                <p className="font-medium text-sm truncate">{b.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+                  {d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} ·{' '}
+                  {left === 0 ? 'сегодня!' : `${left} дн.`}
                   {b.note ? ` · ${b.note}` : ''}
                 </p>
               </div>
+              <span className="text-lg shrink-0" role="img" aria-label="Подарок">
+                🎁
+              </span>
               <button
                 type="button"
-                className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
                 onClick={() => remove(b.id)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -101,6 +125,18 @@ export function BirthdaysView() {
             Пока пусто — добавьте первый день рождения
           </p>
         )}
+      </div>
+
+      <div className="tf-glass rounded-2xl p-4 mt-4 flex items-center gap-3">
+        <span className="text-3xl shrink-0" role="img" aria-label="Подарок">
+          🎁
+        </span>
+        <div>
+          <p className="text-sm font-semibold">Добавьте дни рождения</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Не забудьте поздравить близких и друзей!
+          </p>
+        </div>
       </div>
     </div>
   );

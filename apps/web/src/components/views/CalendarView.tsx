@@ -170,9 +170,9 @@ export function CalendarView() {
                   onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
                   onDrop={(e) => onDropDay(e, key)}
                   className={cn(
-                    'min-h-[90px] border rounded-md p-1.5 transition-colors relative',
-                    !inMonth && 'opacity-40 bg-muted/20',
-                    isToday(day) && 'bg-primary/5 border-primary/30',
+                    'min-h-[90px] rounded-xl tf-glass p-1.5 transition-colors relative',
+                    !inMonth && 'opacity-40',
+                    isToday(day) && 'ring-1 ring-primary/60 shadow-[0_0_18px_-6px_var(--tf-glow)]',
                     dragOverKey === key && 'ring-2 ring-primary bg-primary/10'
                   )}
                 >
@@ -232,11 +232,11 @@ export function CalendarView() {
                         onDragStart={(e) => onDragStart(e, task.id)}
                         onClick={() => setSelectedTask(task.id)}
                         className={cn(
-                          'w-full text-left text-[11px] px-1 py-0.5 rounded truncate cursor-grab active:cursor-grabbing',
+                          'w-full text-left text-[11px] px-1.5 py-0.5 rounded-md truncate cursor-grab active:cursor-grabbing border border-primary/25',
                           'hover:opacity-80',
                           task.status === 'COMPLETED'
                             ? 'line-through text-muted-foreground bg-muted'
-                            : 'bg-primary/10 text-foreground'
+                            : 'bg-primary/10 text-foreground shadow-[0_0_10px_-4px_var(--tf-glow)]'
                         )}
                       >
                         <span
@@ -277,8 +277,8 @@ export function CalendarView() {
                   onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
                   onDrop={(e) => onDropDay(e, key)}
                   className={cn(
-                    'flex flex-col border rounded-lg overflow-hidden',
-                    isToday(day) && 'border-primary/40 bg-primary/5',
+                    'flex flex-col rounded-2xl tf-glass overflow-hidden',
+                    isToday(day) && 'ring-1 ring-primary/60 shadow-[0_0_18px_-6px_var(--tf-glow)]',
                     dragOverKey === key && 'ring-2 ring-primary'
                   )}
                 >
@@ -303,10 +303,10 @@ export function CalendarView() {
                         onDragStart={(e) => onDragStart(e, task.id)}
                         onClick={() => setSelectedTask(task.id)}
                         className={cn(
-                          'w-full text-left text-xs px-2 py-1.5 rounded-md cursor-grab active:cursor-grabbing',
+                          'w-full text-left text-xs px-2 py-1.5 rounded-xl cursor-grab active:cursor-grabbing border border-primary/20 bg-card/50',
                           task.status === 'COMPLETED'
                             ? 'line-through text-muted-foreground bg-muted'
-                            : 'bg-card border hover:bg-accent'
+                            : 'hover:bg-accent shadow-[0_0_10px_-6px_var(--tf-glow)]'
                         )}
                       >
                         {task.title}

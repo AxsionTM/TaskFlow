@@ -20,6 +20,8 @@ import { GraphView } from '@/components/views/GraphView';
 import { TodayDashboard } from '@/components/views/TodayDashboard';
 import { TomorrowView } from '@/components/views/TomorrowView';
 import { WeekView } from '@/components/views/WeekView';
+import { OverdueView } from '@/components/views/OverdueView';
+import { InboxView } from '@/components/views/InboxView';
 import { Loader2, List, Columns3, Grid2x2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
@@ -132,6 +134,8 @@ export function TaskList() {
   if (currentView === 'birthdays') return <BirthdaysView />;
   if (currentView === 'graph') return <GraphView />;
   if (currentView === 'calendar') return <CalendarView />;
+  if (currentView === 'overdue' && displayMode === 'list') return <OverdueView />;
+  if (currentView === 'inbox' && displayMode === 'list') return <InboxView />;
 
   let title = viewTitles[currentView] || 'Задачи';
   if (currentView === 'project' && currentProjectId) {

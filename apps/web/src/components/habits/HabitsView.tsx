@@ -135,18 +135,38 @@ export function HabitsView() {
             Привычки
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Отмечайте выполнение и следите за сериями
+            Маленькие шаги — большие результаты
           </p>
         </div>
-        <Button size="sm" className="gap-1.5" onClick={() => setShowForm(true)}>
+        <Button size="sm" className="tf-btn-violet gap-1.5" onClick={() => setShowForm(true)}>
           <Plus className="h-4 w-4" />
           Привычка
         </Button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {habits.length > 0 && (
+          <div className="tf-glass rounded-2xl p-3.5">
+            <div className="flex items-baseline justify-between mb-2">
+              <span className="text-2xl font-bold tabular-nums">
+                {habits.filter((h) => h.completedToday).length}/{habits.length}
+              </span>
+              <span className="text-[11px] text-muted-foreground">Сегодня</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${habits.length ? Math.round((habits.filter((h) => h.completedToday).length / habits.length) * 100) : 0}%`,
+                  background: 'linear-gradient(90deg, hsl(var(--primary)), var(--tf-accent2))',
+                  boxShadow: '0 0 12px -2px var(--tf-glow)',
+                }}
+              />
+            </div>
+          </div>
+        )}
         {showForm && (
-          <div className="rounded-xl border bg-card p-4 space-y-3">
+          <div className="tf-glass rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium">Новая привычка</h3>
               <button onClick={() => setShowForm(false)} className="p-1 rounded hover:bg-accent">
@@ -206,7 +226,7 @@ export function HabitsView() {
           habits.map((habit) => (
             <div
               key={habit.id}
-              className="rounded-xl border bg-card p-4 flex items-start gap-4 hover:shadow-sm transition-shadow"
+              className="tf-glass rounded-2xl p-4 flex items-start gap-4 hover:shadow-sm transition-shadow"
             >
               <HabitToggle
                 done={!!habit.completedToday}
@@ -242,6 +262,15 @@ export function HabitsView() {
               </button>
             </div>
           ))
+        )}
+
+        {habits.length > 0 && (
+          <div className="tf-glass rounded-2xl p-4 text-center">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Лучшие результаты приходят от постоянства,
+              <br />а не от идеальности.
+            </p>
+          </div>
         )}
       </div>
     </div>
