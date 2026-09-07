@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   Calendar,
+  CalendarDays,
   ChevronDown,
   ChevronRight,
   Folder,
@@ -42,10 +43,11 @@ import { api } from '@/lib/api';
 
 const smartViews = [
   { id: 'today', label: 'Сегодня', icon: Sun },
-  { id: 'agenda', label: 'Повестка дня', icon: ListTodo },
   { id: 'tomorrow', label: 'Завтра', icon: Calendar },
+  { id: 'agenda', label: 'Повестка дня', icon: ListTodo },
   { id: 'week', label: 'На этой неделе', icon: LayoutList },
   { id: 'overdue', label: 'Просроченные', icon: AlertCircle },
+  { id: 'calendar', label: 'Календарь', icon: CalendarDays },
 ];
 
 interface SidebarProps {

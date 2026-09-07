@@ -20,6 +20,7 @@ const createTaskSchema = z.object({
   recurrenceType: z.enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'CUSTOM']).optional(),
   recurrenceRule: z.string().optional().nullable(),
   remindMinutes: z.number().int().optional().nullable(),
+  remindRepeatMinutes: z.number().int().min(1).max(60).optional().nullable(),
   tagIds: z.array(z.string()).optional(),
   checklist: z
     .array(z.object({ title: z.string(), isCompleted: z.boolean().optional() }))
@@ -440,6 +441,23 @@ router.get('/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
+// Серия напоминаний: первое за remindMinutes до срока, дальше повтор
+// каждые repeatMinutes вплоть до срока (максимум 12 штук от спама).
+function buildReminderTimes(due: Date, remindMinutes: number, repeatMinutes?: number | null): Date[] {
+  const first = new Date(due.getTime() - remindMinutes * 60 * 1000);
+  const times: Date[] = [first];
+  if (repeatMinutes && repeatMinutes > 0) {
+    let next = new Date(first.getTime() + repeatMinutes * 60 * 1000);
+    let guard = 0;
+    while (next.getTime() <= due.getTime() && guard < 11) {
+      times.push(new Date(next));
+      next = new Date(next.getTime() + repeatMinutes * 60 * 1000);
+      guard++;
+    }
+  }
+  return times;
+}
+
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const data = createTaskSchema.parse(req.body);
@@ -482,13 +500,15 @@ router.post('/', async (req: AuthRequest, res, next) => {
       },
     });
 
-    // Browser/server reminder relative to dueDate
+    // Browser/server reminders relative to dueDate (with optional repeat series)
     if (data.dueDate && data.remindMinutes != null && data.remindMinutes >= 0) {
       const due = new Date(data.dueDate);
-      const remindAt = new Date(due.getTime() - data.remindMinutes * 60 * 1000);
-      await prisma.reminder.create({
-        data: { taskId: task.id, remindAt },
-      });
+      const times = buildReminderTimes(due, data.remindMinutes, data.remindRepeatMinutes);
+      for (const remindAt of times) {
+        await prisma.reminder.create({
+          data: { taskId: task.id, remindAt },
+        });
+      }
     }
 
     const io = req.app.get('io');
@@ -545,6 +565,7 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
     delete updateData.tagIds;
     delete updateData.checklist;
     delete updateData.remindMinutes;
+    delete updateData.remindRepeatMinutes;
 
     if (tagIds !== undefined) {
       await prisma.taskTag.deleteMany({ where: { taskId: req.params.id } });
@@ -596,17 +617,21 @@ router.put('/:id/reminder', async (req: AuthRequest, res, next) => {
     if (!task.dueDate) throw new AppError(400, 'Сначала укажите срок задачи');
 
     const minutes = z.number().int().min(0).nullable().optional().parse(req.body.remindMinutes);
-    
+    const repeat = z.number().int().min(1).max(60).nullable().optional().parse(req.body.repeatMinutes);
+
     await prisma.reminder.deleteMany({ where: { taskId: task.id } });
 
     if (minutes == null) {
       return res.json({ success: true, reminder: null });
     }
 
-    const remindAt = new Date(task.dueDate.getTime() - minutes * 60 * 1000);
-    const reminder = await prisma.reminder.create({
-      data: { taskId: task.id, remindAt, isSent: false },
-    });
+    const times = buildReminderTimes(task.dueDate, minutes, repeat);
+    let reminder = null;
+    for (const remindAt of times) {
+      reminder = await prisma.reminder.create({
+        data: { taskId: task.id, remindAt, isSent: false },
+      });
+    }
     res.json({ success: true, reminder });
   } catch (err) {
     next(err);
@@ -688,51 +713,9 @@ router.post('/:id/complete', async (req: AuthRequest, res, next) => {
       },
     });
 
-    // Spawn next occurrence when completing a recurring task
-    if (
-      newStatus === 'COMPLETED' &&
-      existing.recurrenceType &&
-      existing.recurrenceType !== 'NONE'
-    ) {
-      const nextDue = shiftDate(existing.dueDate, existing.recurrenceType);
-      const nextStart = shiftDate(existing.startDate, existing.recurrenceType);
-      if (nextDue || nextStart || existing.recurrenceType === 'DAILY') {
-        const next = await prisma.task.create({
-          data: {
-            title: existing.title,
-            description: existing.description,
-            priority: existing.priority,
-            dueDate: nextDue,
-            startDate: nextStart,
-            isAllDay: existing.isAllDay,
-            projectId: existing.projectId,
-            sectionId: existing.sectionId,
-            creatorId: existing.creatorId,
-            recurrenceType: existing.recurrenceType,
-            recurrenceRule: existing.recurrenceRule,
-            status: 'TODO',
-            tags:
-              existing.tags.length > 0
-                ? { create: existing.tags.map((t) => ({ tagId: t.tagId })) }
-                : undefined,
-            checklist:
-              existing.checklist.length > 0
-                ? {
-                    create: existing.checklist.map((c, i) => ({
-                      title: c.title,
-                      isCompleted: false,
-                      sortOrder: i,
-                    })),
-                  }
-                : undefined,
-          },
-        });
-        const io2 = req.app.get('io');
-        if (io2) {
-          io2.to(`user:${req.userId}`).emit('task:created', next);
-        }
-      }
-    }
+    // Recurrence отключен в UI: при выполнении копии больше не создаем,
+    // чтобы не плодить задачи-призраки. Старые колонки в БД оставлены как есть.
+    void existing;
 
     const io = req.app.get('io');
     if (io) {

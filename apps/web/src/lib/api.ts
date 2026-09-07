@@ -97,10 +97,13 @@ class ApiClient {
     return this.request<{ success: boolean }>(`/tasks/reminders/${id}/sent`, { method: 'POST' });
   }
 
-  setTaskReminder(taskId: string, remindMinutes: number | null) {
+  setTaskReminder(taskId: string, remindMinutes: number | null, repeatMinutes?: number | null) {
     return this.request<{ success: boolean; reminder: any }>(`/tasks/${taskId}/reminder`, {
       method: 'PUT',
-      body: JSON.stringify({ remindMinutes }),
+      body: JSON.stringify({
+        remindMinutes,
+        repeatMinutes: repeatMinutes ?? null,
+      }),
     });
   }
 

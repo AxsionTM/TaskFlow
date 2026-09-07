@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   X,
   Calendar,
@@ -14,7 +14,6 @@ import {
   Sparkles,
   ListTree,
   Archive,
-  Repeat,
   Clock3,
   FolderKanban,
   ListChecks,
@@ -52,9 +51,9 @@ export function TaskDetail() {
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
-  const [recurrenceType, setRecurrenceType] = useState('NONE');
   const [remindMinutes, setRemindMinutes] = useState<number | null>(null);
-  const [showRecurrenceMenu, setShowRecurrenceMenu] = useState(false);
+  const [remindRepeat, setRemindRepeat] = useState<number | ''>('');
+  const descRef = useRef<HTMLTextAreaElement>(null);
   const [tags, setTags] = useState<any[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState('');
@@ -90,7 +89,6 @@ export function TaskDetail() {
       setStartTime(t.startDate && !t.isAllDay ? new Date(t.startDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '');
       setProjectId(t.projectId || '');
       setSelectedTagIds(t.tags?.map((tt: any) => tt.tag.id) || []);
-      setRecurrenceType(t.recurrenceType || 'NONE');
       if (t.reminders?.length && t.dueDate) {
         const rem = t.reminders[0];
         const diff = Math.round((new Date(t.dueDate).getTime() - new Date(rem.remindAt).getTime()) / 60000);
@@ -108,6 +106,14 @@ export function TaskDetail() {
   useEffect(() => {
     loadTask();
   }, [loadTask]);
+
+  // Описание растет вместе с текстом вместо 3 строк со скроллом.
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 400) + 'px';
+  }, [description, selectedTaskId]);
 
   useEffect(() => {
     api.getTags().then(({ tags: t }) => setTags(t)).catch(() => {});
@@ -433,11 +439,12 @@ const handleDueDateChange = (value: string) => {
           {/* Description */}
           <div className="px-4 pb-3">
             <textarea
+              ref={descRef}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionBlur}
               rows={3}
-              className="w-full resize-none bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground/60"
+              className="w-full resize-none overflow-hidden bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground/60"
               placeholder="Описание..."
             />
           </div>
@@ -733,53 +740,6 @@ const handleDueDateChange = (value: string) => {
 
 
           {!isSubtask && <>
-          {/* Recurrence */}
-          <div className="px-4 space-y-1 border-t py-3">
-            <div className="relative">
-              <button
-                onClick={() => setShowRecurrenceMenu(!showRecurrenceMenu)}
-                className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-accent"
-              >
-                <Repeat className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Повтор</span>
-                <span className="ml-auto text-sm">
-                  {{
-                    NONE: 'Нет',
-                    DAILY: 'Ежедневно',
-                    WEEKLY: 'Еженедельно',
-                    MONTHLY: 'Ежемесячно',
-                    YEARLY: 'Ежегодно',
-                  }[recurrenceType] || 'Нет'}
-                </span>
-              </button>
-              {showRecurrenceMenu && (
-                <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-md border bg-card shadow-lg py-1">
-                  {[
-                    { value: 'NONE', label: 'Нет' },
-                    { value: 'DAILY', label: 'Ежедневно' },
-                    { value: 'WEEKLY', label: 'Еженедельно' },
-                    { value: 'MONTHLY', label: 'Ежемесячно' },
-                    { value: 'YEARLY', label: 'Ежегодно' },
-                  ].map((r) => (
-                    <button
-                      key={r.value}
-                      onClick={() => {
-                        setRecurrenceType(r.value);
-                        setShowRecurrenceMenu(false);
-                        save({ recurrenceType: r.value });
-                      }}
-                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent ${
-                        recurrenceType === r.value ? 'bg-accent' : ''
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* AI */}
           
           {/* Reminder */}
@@ -795,24 +755,15 @@ const handleDueDateChange = (value: string) => {
                 const v = e.target.value;
                 const mins = v === '' ? null : Number(v);
                 setRemindMinutes(mins);
+                if (mins === null) setRemindRepeat('');
                 if (!selectedTaskId) return;
                 if (!dueDate) return;
                 try {
-                  if (typeof (api as any).setTaskReminder === 'function') {
-                    await (api as any).setTaskReminder(selectedTaskId, mins);
-                  } else {
-                    await fetch(
-                      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/tasks/${selectedTaskId}/reminder`,
-                      {
-                        method: 'PUT',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          Authorization: `Bearer ${localStorage.getItem('token') || localStorage.getItem('tf-token') || ''}`,
-                        },
-                        body: JSON.stringify({ remindMinutes: mins }),
-                      }
-                    );
-                  }
+                  await api.setTaskReminder(
+                    selectedTaskId,
+                    mins,
+                    mins === null || remindRepeat === '' ? null : Number(remindRepeat)
+                  );
                 } catch (err: any) {
                   alert(err.message || 'Не удалось сохранить напоминание');
                 }
@@ -826,6 +777,36 @@ const handleDueDateChange = (value: string) => {
               <option value="60">За 1 час</option>
               <option value="1440">За 1 день</option>
             </select>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Повтор каждых</span>
+              <select
+                className="h-9 flex-1 rounded-md border border-input bg-card px-2 text-sm disabled:opacity-40"
+                value={remindRepeat === '' ? '' : String(remindRepeat)}
+                disabled={!dueDate || remindMinutes === null}
+                title="Будет напоминать повторно с этим интервалом вплоть до срока"
+                onChange={async (e) => {
+                  const rep = e.target.value === '' ? '' : Number(e.target.value);
+                  setRemindRepeat(rep as number | '');
+                  if (!selectedTaskId || !dueDate || remindMinutes === null) return;
+                  try {
+                    await api.setTaskReminder(
+                      selectedTaskId,
+                      remindMinutes,
+                      rep === '' ? null : Number(rep)
+                    );
+                  } catch (err: any) {
+                    alert(err.message || 'Не удалось сохранить повтор');
+                  }
+                }}
+              >
+                <option value="">Не повторять</option>
+                <option value="1">1 мин</option>
+                <option value="5">5 мин</option>
+                <option value="10">10 мин</option>
+                <option value="20">20 мин</option>
+                <option value="30">30 мин</option>
+              </select>
+            </div>
             {!dueDate && (
               <p className="text-[11px] text-muted-foreground mt-1">
                 Сначала укажите дату окончания (срок).

@@ -17,7 +17,7 @@ import { PulseView } from '@/components/views/PulseView';
 import { ProfileView } from '@/components/views/ProfileView';
 import { BirthdaysView } from '@/components/views/BirthdaysView';
 import { GraphView } from '@/components/views/GraphView';
-import { Loader2, List, Columns3, CalendarDays, Grid2x2, Sparkles } from 'lucide-react';
+import { Loader2, List, Columns3, Grid2x2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 
@@ -33,12 +33,12 @@ const viewTitles: Record<string, string> = {
   graph: 'Граф',
   inbox: 'Входящие',
   project: 'Проект',
+  calendar: 'Календарь',
 };
 
 const DISPLAY_MODES: { id: DisplayMode; label: string; icon: typeof List }[] = [
   { id: 'list', label: 'Список', icon: List },
   { id: 'kanban', label: 'Канбан', icon: Columns3 },
-  { id: 'calendar', label: 'Календарь', icon: CalendarDays },
   { id: 'matrix', label: 'Матрица', icon: Grid2x2 },
 ];
 
@@ -128,6 +128,7 @@ export function TaskList() {
   if (currentView === 'profile') return <ProfileView />;
   if (currentView === 'birthdays') return <BirthdaysView />;
   if (currentView === 'graph') return <GraphView />;
+  if (currentView === 'calendar') return <CalendarView />;
 
   let title = viewTitles[currentView] || 'Задачи';
   if (currentView === 'project' && currentProjectId) {
@@ -231,15 +232,6 @@ export function TaskList() {
           </div>
         ) : (
           <KanbanBoard />
-        ))}
-
-      {displayMode === 'calendar' &&
-        (isLoading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <CalendarView />
         ))}
 
       {displayMode === 'matrix' &&

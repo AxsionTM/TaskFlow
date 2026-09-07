@@ -26,7 +26,8 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const features = [
   {
@@ -261,6 +262,16 @@ function VisualShowcase() {
 
 export default function HomePage() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const router = useRouter();
+
+  // Если уже вошли — сразу в приложение, а не на лендинг.
+  // Токен живет в localStorage конкретного домена, поэтому важно
+  // открывать один и тот же канонический URL (без www / превью-доменов).
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('token')) router.replace('/app');
+    } catch {}
+  }, [router]);
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#070a12] text-white selection:bg-primary/30">

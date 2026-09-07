@@ -110,6 +110,44 @@ function rememberMutation(id: string, task: Task | null) {
   recentMutations.set(id, { task, ts: Date.now() });
 }
 
+const VIEW_KEY = 'tf-current-view';
+const PROJECT_KEY = 'tf-current-project';
+const MODE_KEY = 'tf-display-mode';
+const KNOWN_VIEWS = new Set([
+  'today', 'tomorrow', 'agenda', 'week', 'overdue', 'inbox', 'project',
+  'habits', 'goals', 'focus', 'birthdays', 'graph', 'pulse', 'trash',
+  'profile', 'calendar',
+]);
+
+function loadStoredView(): string {
+  try {
+    if (typeof window === 'undefined') return 'today';
+    const view = localStorage.getItem(VIEW_KEY);
+    return view && KNOWN_VIEWS.has(view) ? view : 'today';
+  } catch {
+    return 'today';
+  }
+}
+
+function loadStoredProject(): string | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(PROJECT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function loadStoredMode(): DisplayMode {
+  try {
+    if (typeof window === 'undefined') return 'list';
+    const mode = localStorage.getItem(MODE_KEY);
+    return mode === 'kanban' || mode === 'matrix' ? mode : 'list';
+  } catch {
+    return 'list';
+  }
+}
+
 function mergeFreshInto(list: Task[], gate?: (task: Task) => boolean): Task[] {
   const now = Date.now();
   let result = list;
@@ -148,11 +186,11 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
   selectedTaskId: null,
 
-  currentView: "today",
+  currentView: loadStoredView(),
 
-  currentProjectId: null,
+  currentProjectId: loadStoredProject(),
 
-  displayMode: "list",
+  displayMode: loadStoredMode(),
 
   fetchTasks: async (params, opts) => {
     const silent = Boolean(opts?.silent);
@@ -226,8 +264,10 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         ? "true"
         : undefined;
 
-    // Calendar always shows all open tasks for the month (not only today)
-    if (displayMode === "calendar") {
+    // Calendar always shows all open tasks for the month (not only today).
+    // Календарь — отдельная вкладка (currentView), старый режим displayMode
+    // оставлен для совместимости.
+    if (displayMode === "calendar" || currentView === "calendar") {
       await fetchTasks(
         {
           includeCompleted: "true",
@@ -477,18 +517,32 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       selectedTaskId: id,
     }),
 
-  setCurrentView: (view) =>
+  setCurrentView: (view) => {
+    try {
+      if (typeof window !== 'undefined') localStorage.setItem(VIEW_KEY, view);
+    } catch {}
     set({
       currentView: view,
       selectedTaskId: null,
-    }),
+    });
+  },
 
-  setCurrentProject: (id) =>
+  setCurrentProject: (id) => {
+    try {
+      if (typeof window !== 'undefined') {
+        if (id) localStorage.setItem(PROJECT_KEY, id);
+        else localStorage.removeItem(PROJECT_KEY);
+      }
+    } catch {}
     set({
       currentProjectId: id,
-    }),
+    });
+  },
 
   setDisplayMode: (mode) => {
+    try {
+      if (typeof window !== 'undefined') localStorage.setItem(MODE_KEY, mode);
+    } catch {}
     set({
       displayMode: mode,
     });

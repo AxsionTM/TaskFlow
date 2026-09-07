@@ -199,10 +199,14 @@ export function KanbanBoard() {
   const handleQuickAdd = async (status: string) => {
     const title = prompt('Название задачи:');
     if (!title?.trim()) return;
+    const now = new Date();
     await createTask({
       title: title.trim(),
       status: status === 'COMPLETED' ? 'TODO' : status,
       projectId: currentProjectId || undefined,
+      startDate: now.toISOString(),
+      dueDate: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+      isAllDay: false,
     });
   };
 

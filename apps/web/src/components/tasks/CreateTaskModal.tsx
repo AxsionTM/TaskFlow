@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Flag, Calendar, Tag, Folder, AlignLeft, Clock3, AlertTriangle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,13 +43,14 @@ export function CreateTaskModal({ open, onClose }: Props) {
   const [tags, setTags] = useState<any[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
-  const [recurrenceType, setRecurrenceType] = useState('NONE');
   const [remindMinutes, setRemindMinutes] = useState<number | ''>('');
+  const [remindRepeat, setRemindRepeat] = useState<number | ''>('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [timeConflict, setTimeConflict] = useState('');
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [pendingData, setPendingData] = useState<any | null>(null);
+  const descRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -57,6 +58,14 @@ export function CreateTaskModal({ open, onClose }: Props) {
     setProjectId(currentProjectId || '');
     api.getTags().then(({ tags: t }) => setTags(t)).catch(() => {});
   }, [open, currentProjectId, fetchProjects]);
+
+  // Поле описания растет вместе с текстом вместо 2 строк со скроллом.
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 320) + 'px';
+  }, [description, open]);
 
   const reset = () => {
     setTitle('');
@@ -69,8 +78,8 @@ export function CreateTaskModal({ open, onClose }: Props) {
     setDueTime('');
     setSelectedTagIds([]);
     setNewTag('');
-    setRecurrenceType('NONE');
     setRemindMinutes('');
+    setRemindRepeat('');
     setError('');
     setTimeConflict('');
     setConflicts([]);
@@ -110,22 +119,33 @@ export function CreateTaskModal({ open, onClose }: Props) {
     setSubmitting(true);
     setError('');
     try {
-      const startIso = toIso(startDate, startTime);
-      const dueIso = toIso(dueDate, dueTime || (dueDate && startTime ? startTime : ''));
+      let startIso = toIso(startDate, startTime);
+      let dueIso = toIso(dueDate, dueTime || (dueDate && startTime ? startTime : ''));
+      // Если время не указали — стартуем прямо сейчас (+1 час на выполнение),
+      // чтобы задача не падала холостой во Входящие.
+      const autoDates = !startIso && !dueIso;
+      if (autoDates) {
+        const now = new Date();
+        startIso = now.toISOString();
+        dueIso = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+      }
       const data: any = {
         title: title.trim(),
         description: description.trim() || undefined,
         priority: priority !== 'NONE' ? priority : 'NONE',
         projectId: projectId || undefined,
-        isAllDay: !startTime && !dueTime,
+        isAllDay: autoDates ? false : !startTime && !dueTime,
         tagIds: selectedTagIds.length ? selectedTagIds : undefined,
       };
       if (startIso) data.startDate = startIso;
       if (dueIso) data.dueDate = dueIso;
-      if (recurrenceType && recurrenceType !== 'NONE') data.recurrenceType = recurrenceType;
       if (dueIso && remindMinutes !== '') data.remindMinutes = Number(remindMinutes);
+      if (dueIso && remindMinutes !== '' && remindRepeat !== '') {
+        data.remindRepeatMinutes = Number(remindRepeat);
+      }
 
-      if (startIso && dueIso) {
+      // Автодаты не проверяем на пересечения — они служебные.
+      if (startIso && dueIso && !autoDates) {
         try {
           const { tasks: existing } = await api.getTasks({ includeCompleted: 'false' });
           const startMs = new Date(startIso).getTime();
@@ -228,11 +248,12 @@ export function CreateTaskModal({ open, onClose }: Props) {
           <div className="flex items-start gap-2">
             <AlignLeft className="h-4 w-4 mt-2.5 text-muted-foreground shrink-0" />
             <textarea
+              ref={descRef}
               placeholder="Описание"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
 
@@ -332,7 +353,7 @@ export function CreateTaskModal({ open, onClose }: Props) {
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Без даты задача попадёт во Входящие, не в «Сегодня».
+              Без даты время подставится само: начало — сейчас, конец — через час.
             </p>
           </div>
 
@@ -387,30 +408,17 @@ export function CreateTaskModal({ open, onClose }: Props) {
           </div>
 
           
-          {/* Recurrence + reminder */}
+          {/* Reminder + repeat */}
           <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[11px] text-muted-foreground">Повтор</label>
-              <select
-                value={recurrenceType}
-                onChange={(e) => setRecurrenceType(e.target.value)}
-                className="mt-0.5 flex h-9 w-full rounded-md border border-input bg-card px-2 text-sm"
-              >
-                <option value="NONE">Не повторять</option>
-                <option value="DAILY">Каждый день</option>
-                <option value="WEEKLY">Каждую неделю</option>
-                <option value="MONTHLY">Каждый месяц</option>
-                <option value="YEARLY">Каждый год</option>
-              </select>
-            </div>
             <div>
               <label className="text-[11px] text-muted-foreground">Напоминание</label>
               <select
                 value={remindMinutes === '' ? '' : String(remindMinutes)}
-                onChange={(e) =>
-                  setRemindMinutes(e.target.value === '' ? '' : Number(e.target.value))
-                }
-                disabled={!dueDate}
+                onChange={(e) => {
+                  const v = e.target.value === '' ? '' : Number(e.target.value);
+                  setRemindMinutes(v);
+                  if (v === '') setRemindRepeat('');
+                }}
                 className="mt-0.5 flex h-9 w-full rounded-md border border-input bg-card px-2 text-sm disabled:opacity-40"
               >
                 <option value="">Нет</option>
@@ -420,6 +428,25 @@ export function CreateTaskModal({ open, onClose }: Props) {
                 <option value="30">За 30 минут</option>
                 <option value="60">За 1 час</option>
                 <option value="1440">За 1 день</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-muted-foreground">Повтор каждых</label>
+              <select
+                value={remindRepeat === '' ? '' : String(remindRepeat)}
+                onChange={(e) =>
+                  setRemindRepeat(e.target.value === '' ? '' : Number(e.target.value))
+                }
+                disabled={remindMinutes === ''}
+                title="Будет напоминать повторно с этим интервалом вплоть до срока"
+                className="mt-0.5 flex h-9 w-full rounded-md border border-input bg-card px-2 text-sm disabled:opacity-40"
+              >
+                <option value="">Не повторять</option>
+                <option value="1">1 мин</option>
+                <option value="5">5 мин</option>
+                <option value="10">10 мин</option>
+                <option value="20">20 мин</option>
+                <option value="30">30 мин</option>
               </select>
             </div>
           </div>
