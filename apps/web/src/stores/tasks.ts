@@ -281,63 +281,134 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   },
 
   createTask: async (data) => {
-    const { task } = await api.createTask(data);
+    // Настоящий optimistic: показываем СРАЗУ, не дожидаясь ответа API.
+    // На Vercel (3 отдельных проекта) POST может идти секунды из-за
+    // cold start — раньше задача появлялась только после перезагрузки.
+    const isSubtask = Boolean(data.parentId);
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const tempTask = {
+      id: tempId,
+      status: 'TODO',
+      priority: 'NONE',
+      ...data,
+    } as Task;
 
-    // Мгновенный optimistic-update: задача видна сразу на ПК и mobile,
-    // без перезагрузки. Подзадачи (parentId) не кладем в корневые списки.
-    if (!task.parentId) {
+    if (!isSubtask) {
       set((state) => {
-        const addIfMissing = (items: Task[]) =>
-          items.some((item) => item.id === task.id) ? items : [task, ...items];
-
+        const addIfMissing = (items: Task[], item: Task) =>
+          items.some((entry) => entry.id === item.id) ? items : [item, ...items];
         return {
-          tasks: addIfMissing(state.tasks),
-          todayTasks: matchesTodayFilter(task as Task)
-            ? addIfMissing(state.todayTasks)
+          tasks: addIfMissing(state.tasks, tempTask),
+          todayTasks: matchesTodayFilter(tempTask)
+            ? addIfMissing(state.todayTasks, tempTask)
             : state.todayTasks,
-          overdueTasks: matchesOverdueFilter(task as Task)
-            ? addIfMissing(state.overdueTasks)
+          overdueTasks: matchesOverdueFilter(tempTask)
+            ? addIfMissing(state.overdueTasks, tempTask)
             : state.overdueTasks,
         };
       });
     }
 
-    // Тихая сверка с сервером: без isLoading-спиннера, который раньше
-    // прятал список и создавал ощущение "не появилось до перезагрузки".
-    // await, а не void — иначе фоновый fetch с кэшем затирал optimistic.
-    await get().refreshCurrentView({ silent: true }).catch(() => {});
-    return task;
+    try {
+      const { task } = await api.createTask(data);
+
+      if (!task.parentId) {
+        // Меняем временную карточку на настоящую с сервера.
+        set((state) => {
+          const swap = (items: Task[], shouldAdd: boolean) => {
+            if (items.some((entry) => entry.id === tempId)) {
+              return items.map((entry) => (entry.id === tempId ? (task as Task) : entry));
+            }
+            if (shouldAdd && !items.some((entry) => entry.id === task.id)) {
+              return [task as Task, ...items];
+            }
+            return items;
+          };
+          return {
+            tasks: swap(state.tasks, true),
+            todayTasks: swap(state.todayTasks, matchesTodayFilter(task as Task)),
+            overdueTasks: swap(state.overdueTasks, matchesOverdueFilter(task as Task)),
+          };
+        });
+      }
+
+      // Тихая сверка с сервером без спиннера.
+      await get().refreshCurrentView({ silent: true }).catch(() => {});
+      return task;
+    } catch (e) {
+      // Откат временной карточки, чтобы не было "призраков".
+      if (!isSubtask) {
+        set((state) => ({
+          tasks: state.tasks.filter((entry) => entry.id !== tempId),
+          todayTasks: state.todayTasks.filter((entry) => entry.id !== tempId),
+          overdueTasks: state.overdueTasks.filter((entry) => entry.id !== tempId),
+        }));
+      }
+      throw e;
+    }
   },
 
   updateTask: async (id, data) => {
-    const { task } = await api.updateTask(id, data);
-
+    // Optimistic сразу, затем подтверждение с сервера.
+    const snap = { tasks: get().tasks, todayTasks: get().todayTasks, overdueTasks: get().overdueTasks };
     set((state) => ({
-      tasks: state.tasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
-      todayTasks: state.todayTasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
-      overdueTasks: state.overdueTasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
+      tasks: state.tasks.map((item) => (item.id === id ? { ...item, ...data } : item)),
+      todayTasks: state.todayTasks.map((item) => (item.id === id ? { ...item, ...data } : item)),
+      overdueTasks: state.overdueTasks.map((item) => (item.id === id ? { ...item, ...data } : item)),
     }));
+
+    try {
+      const { task } = await api.updateTask(id, data);
+      set((state) => ({
+        tasks: state.tasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
+        todayTasks: state.todayTasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
+        overdueTasks: state.overdueTasks.map((item) => (item.id === id ? { ...item, ...task } : item)),
+      }));
+    } catch (e) {
+      set(snap);
+      throw e;
+    }
 
     await get().refreshCurrentView({ silent: true }).catch(() => {});
   },
 
   completeTask: async (id) => {
-    const { task } = await api.completeTask(id);
-    const completed = task || { id, status: 'COMPLETED' };
+    const current =
+      get().tasks.find((item) => item.id === id) ??
+      get().todayTasks.find((item) => item.id === id);
+    const optimisticStatus = current?.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
 
     set((state) => ({
-      tasks: state.tasks.map((item) => (item.id === id ? { ...item, ...completed } : item)),
-      todayTasks: state.todayTasks.map((item) => (item.id === id ? { ...item, ...completed } : item)),
-      overdueTasks: state.overdueTasks.filter((item) => item.id !== id),
+      tasks: state.tasks.map((item) => (item.id === id ? { ...item, status: optimisticStatus } : item)),
+      todayTasks: state.todayTasks.map((item) =>
+        item.id === id ? { ...item, status: optimisticStatus } : item
+      ),
+      overdueTasks:
+        optimisticStatus === 'COMPLETED'
+          ? state.overdueTasks.filter((item) => item.id !== id)
+          : state.overdueTasks,
     }));
+
+    try {
+      const { task } = await api.completeTask(id);
+      const completed = task || { id, status: optimisticStatus };
+      set((state) => ({
+        tasks: state.tasks.map((item) => (item.id === id ? { ...item, ...completed } : item)),
+        todayTasks: state.todayTasks.map((item) => (item.id === id ? { ...item, ...completed } : item)),
+        overdueTasks: state.overdueTasks.filter((item) => item.id !== id),
+      }));
+    } catch (e) {
+      await get().refreshCurrentView({ silent: true }).catch(() => {});
+      throw e;
+    }
 
     await get().refreshCurrentView({ silent: true }).catch(() => {});
   },
 
   deleteTask: async (id) => {
-    await api.deleteTask(id);
-
+    // Удаляем из UI мгновенно, запрос на сервер идет следом.
     const { selectedTaskId } = get();
+    const snap = { tasks: get().tasks, todayTasks: get().todayTasks, overdueTasks: get().overdueTasks };
 
     set((state) => ({
       tasks: state.tasks.filter((item) => item.id !== id),
@@ -345,6 +416,14 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       overdueTasks: state.overdueTasks.filter((item) => item.id !== id),
       selectedTaskId: selectedTaskId === id ? null : selectedTaskId,
     }));
+
+    try {
+      await api.deleteTask(id);
+    } catch (e) {
+      // Откат, если сервер отклонил удаление (например CORS/сеть на Vercel).
+      set(snap);
+      throw e;
+    }
 
     await get().refreshCurrentView({ silent: true }).catch(() => {});
   },
