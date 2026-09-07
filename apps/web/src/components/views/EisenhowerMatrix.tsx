@@ -20,8 +20,8 @@ const QUADRANTS: {
 }[] = [
   {
     id: 'do',
-    title: 'Сделать',
-    subtitle: 'Срочно и важно',
+    title: 'Срочно / Важно',
+    subtitle: 'Сделать',
     color: 'border-red-500',
     bg: 'bg-red-500/5',
     priorities: ['HIGH'],
@@ -29,8 +29,8 @@ const QUADRANTS: {
   },
   {
     id: 'schedule',
-    title: 'Запланировать',
-    subtitle: 'Важно, не срочно',
+    title: 'Не срочно / Важно',
+    subtitle: 'Запланировать',
     color: 'border-blue-500',
     bg: 'bg-blue-500/5',
     priorities: ['HIGH', 'MEDIUM'],
@@ -38,8 +38,8 @@ const QUADRANTS: {
   },
   {
     id: 'delegate',
-    title: 'Делегировать',
-    subtitle: 'Срочно, не важно',
+    title: 'Срочно / Не важно',
+    subtitle: 'Делегировать',
     color: 'border-amber-500',
     bg: 'bg-amber-500/5',
     priorities: ['LOW', 'NONE'],
@@ -47,8 +47,8 @@ const QUADRANTS: {
   },
   {
     id: 'eliminate',
-    title: 'Исключить',
-    subtitle: 'Не срочно и не важно',
+    title: 'Не срочно / Не важно',
+    subtitle: 'Исключить',
     color: 'border-gray-400',
     bg: 'bg-muted/30',
     priorities: ['LOW', 'NONE'],

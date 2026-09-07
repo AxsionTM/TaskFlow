@@ -25,11 +25,12 @@ import { cn, priorityColors } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CreateTaskModal } from '@/components/tasks/CreateTaskModal';
 import { TaskCard } from '@/components/tasks/TaskCard';
+import { QuickGlance, MiniCalendar, UpcomingBirthdays } from '@/components/views/SidePanels';
 
 type CalMode = 'month' | 'week';
 
 export function CalendarView() {
-  const { tasks, setSelectedTask, updateTask } = useTasksStore();
+  const { tasks, setSelectedTask, updateTask, setCurrentView } = useTasksStore();
   const { items: birthdays, fetch: fetchBirthdays } = useBirthdaysStore();
   const user = useAuthStore((s) => s.user);
   const effectsOn = useEffectsStore((s) => s.enabled);
@@ -147,8 +148,18 @@ export function CalendarView() {
               {m === 'month' ? 'Месяц' : 'Неделя'}
             </button>
           ))}
+          <button
+            onClick={() => setCurrentView('agenda')}
+            title="Открыть повестку дня"
+            className="px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+          >
+            День
+          </button>
         </div>
       </div>
+
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="flex min-h-0 min-w-0 flex-col">
 
       {/* Month grid */}
       {mode === 'month' && (
@@ -359,6 +370,66 @@ export function CalendarView() {
             Добавить задачу
           </button>
         </div>
+      </div>
+
+      {/* Ближайшие события */}
+      <div className="shrink-0 border-t px-3 py-2.5 sm:px-4">
+        <div className="tf-glass mx-auto max-w-5xl rounded-2xl p-3">
+          <div className="mb-2 text-xs font-semibold text-muted-foreground">Ближайшие события</div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {allTasks
+              .filter((t: any) => t.dueDate && t.status !== 'COMPLETED')
+              .sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+              .slice(0, 8)
+              .map((t: any) => {
+                const c = t.tags?.[0]?.tag?.color || t.project?.color || '#8b5cf6';
+                const d = new Date(t.dueDate);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedKey(format(d, 'yyyy-MM-dd'));
+                      setSelectedTask(t.id);
+                    }}
+                    className="w-44 shrink-0 rounded-xl border border-border/50 bg-card/40 p-2.5 text-left transition-colors hover:bg-accent/60"
+                    style={{ boxShadow: `inset 2px 0 0 ${c}` }}
+                  >
+                    <div className="text-[11px] text-muted-foreground tabular-nums">
+                      {d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })},{' '}
+                      {d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    <div className="mt-0.5 truncate text-xs font-medium">{t.title}</div>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      </div>
+      </div>
+      <div className="hidden min-h-0 min-w-0 flex-col gap-4 overflow-y-auto border-l border-border/50 p-4 lg:flex">
+        <QuickGlance />
+        <MiniCalendar
+          value={new Date(selectedKey + 'T12:00:00')}
+          onSelect={(d) => {
+            setSelectedKey(format(d, 'yyyy-MM-dd'));
+            setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
+          }}
+          taskKeys={new Set(allTasks.flatMap((t: any) => {
+            const keys: string[] = [];
+            for (const raw of [t.startDate, t.dueDate]) {
+              if (!raw) continue;
+              keys.push(format(new Date(raw), 'yyyy-MM-dd'));
+            }
+            return keys;
+          }))}
+          birthdayKeys={new Set(birthdays.map((b: any) => {
+            const d = new Date(b.date);
+            return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          }))}
+        />
+        <UpcomingBirthdays limit={3} />
+      </div>
       </div>
       <CreateTaskModal open={taskOpen} onClose={() => setTaskOpen(false)} initialDate={selectedKey} />
 

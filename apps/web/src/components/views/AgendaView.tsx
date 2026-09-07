@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { TagPill } from "@/components/tasks/TagPill";
 import { TagIcon } from "@/components/tasks/TagIcon";
 import { CreateTaskModal } from "@/components/tasks/CreateTaskModal";
+import { QuickGlance, MiniCalendar, UpcomingBirthdays } from "@/components/views/SidePanels";
 import { ChevronLeft, ChevronRight, Calendar as CalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -40,6 +41,107 @@ function PriorityPill({ priority }: { priority?: string | null }) {
 function subCount(task: any): number {
   if (Array.isArray(task.children)) return task.children.length;
   return task._count?.children ?? 0;
+}
+
+function taskColor(task: any): string {
+  return task.tags?.[0]?.tag?.color || task.project?.color || "#8b5cf6";
+}
+
+const DAYPARTS = [
+  { id: "morning", label: "Утро", range: "08:00 – 12:00", icon: "☀️", from: 5, to: 12 },
+  { id: "day", label: "День", range: "12:00 – 17:00", icon: "🌤️", from: 12, to: 17 },
+  { id: "evening", label: "Вечер", range: "17:00 – 23:00", icon: "🌙", from: 17, to: 23 },
+  { id: "night", label: "Поздний вечер", range: "23:00+", icon: "🌙", from: 23, to: 29 },
+];
+
+function fmtTime(d: Date): string {
+  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+
+function AgendaListRow({ task }: { task: any }) {
+  const { setSelectedTask, completeTask, selectedTaskId } = useTasksStore();
+  const color = taskColor(task);
+  const start = task.startDate ? new Date(task.startDate) : task.dueDate ? new Date(task.dueDate) : null;
+  const end = task.dueDate ? new Date(task.dueDate) : null;
+  const kids = subCount(task);
+  return (
+    <div
+      onClick={() => setSelectedTask(task.id)}
+      className={cn(
+        "tf-glass rounded-2xl px-3.5 py-3 flex items-center gap-3 cursor-pointer",
+        selectedTaskId === task.id && "ring-2 ring-primary/40"
+      )}
+    >
+      <div onClick={(e) => { e.stopPropagation(); completeTask(task.id); }}>
+        <Checkbox checked={task.status === "COMPLETED"} priority={task.priority} ghost size="md" className="tf-check-glow" />
+      </div>
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base font-bold"
+        style={{ color, background: `${color}1a`, border: `1.5px solid ${color}66`, boxShadow: `0 0 14px -4px ${color}88` }}
+      >
+        {(task.title || "?").trim().slice(0, 1).toUpperCase()}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className={cn("block truncate text-[15px] font-medium", task.status === "COMPLETED" && "line-through text-muted-foreground")}>
+          {task.title}
+        </span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+          {task.tags?.[0] && <TagPill tag={task.tags[0].tag} />}
+          {start && <span>{fmtTime(start)}{end && end.getTime() !== start.getTime() ? ` – ${fmtTime(end)}` : ""}</span>}
+          {kids > 0 && <span>· {kids} подзадач</span>}
+        </span>
+      </span>
+      <PriorityPill priority={task.priority} />
+    </div>
+  );
+}
+
+function AgendaListView({ tasks, day }: { tasks: any[]; day: Date }) {
+  const timed = tasks.filter((t) => !(t.isAllDay !== false && !t.startDate));
+  const allDay = tasks.filter((t) => t.isAllDay !== false && !t.startDate);
+  const groups = DAYPARTS.map((p) => ({
+    ...p,
+    items: timed.filter((t) => {
+      const s = t.startDate ? new Date(t.startDate) : t.dueDate ? new Date(t.dueDate) : null;
+      if (!s) return false;
+      let h = s.getHours();
+      if (h < 5) h += 24;
+      return h >= p.from && h < p.to;
+    }),
+  })).filter((g) => g.items.length > 0);
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <CalIcon className="h-8 w-8 mb-2 opacity-40" />
+        <p className="text-sm">Нет задач на этот день</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-4 px-4 py-3">
+      {allDay.length > 0 && (
+        <section>
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+            <span>📅</span>Весь день
+          </div>
+          <div className="space-y-2">
+            {allDay.map((t) => <AgendaListRow key={t.id} task={t} />)}
+          </div>
+        </section>
+      )}
+      {groups.map((g) => (
+        <section key={g.id} className="tf-glass rounded-3xl p-3">
+          <div className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold">
+            <span>{g.icon}</span>{g.label}
+            <span className="text-xs font-normal text-muted-foreground">{g.range}</span>
+          </div>
+          <div className="space-y-2">
+            {g.items.map((t) => <AgendaListRow key={t.id} task={t} />)}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
 }
 
 const START_HOUR=7, END_HOUR=22, HOUR_HEIGHT=72;
@@ -93,7 +195,7 @@ function buildTimedLayout(tasks:any[], day:Date){
 
 export function AgendaView(){
   const {tasks,todayTasks,overdueTasks,setSelectedTask,completeTask,selectedTaskId,fetchTasks,fetchToday,fetchOverdue,updateTask}=useTasksStore();
-  const [dayOffset,setDayOffset]=useState(0);const [dragOverMinute,setDragOverMinute]=useState<number|null>(null);  const [query,setQuery]=useState("");const [activeTag,setActiveTag]=useState("");const [taskOpen,setTaskOpen]=useState(false);
+  const [dayOffset,setDayOffset]=useState(0);const [dragOverMinute,setDragOverMinute]=useState<number|null>(null);  const [query,setQuery]=useState("");const [activeTag,setActiveTag]=useState("");const [taskOpen,setTaskOpen]=useState(false);const [agendaMode,setAgendaMode]=useState<"list"|"timeline">("list");
   const { items: birthdays, fetch: fetchBirthdays } = useBirthdaysStore();
   useEffect(()=>{fetchTasks({includeCompleted:"false"});fetchToday();fetchOverdue();fetchBirthdays();},[fetchTasks,fetchToday,fetchOverdue,fetchBirthdays]);
   const day=useMemo(()=>{const d=new Date();d.setDate(d.getDate()+dayOffset);return startOfDay(d);},[dayOffset]);
@@ -112,6 +214,12 @@ export function AgendaView(){
   return <div className="flex-1 flex flex-col min-h-0">
     <header className="tf-view-header px-4 py-3 border-b flex items-center justify-between gap-3"><div><h1 className="text-lg font-semibold flex items-center gap-2"><CalIcon className="h-5 w-5 text-primary"/>{label.title}</h1><p className="text-xs text-muted-foreground capitalize">{label.sub}</p></div><div className="flex items-center gap-1"><Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={()=>setDayOffset(o=>o-1)}><ChevronLeft className="h-4 w-4"/></Button><Button variant="outline" size="sm" className="h-8 px-3" onClick={()=>setDayOffset(0)}>Сегодня</Button><Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={()=>setDayOffset(o=>o+1)}><ChevronRight className="h-4 w-4"/></Button></div></header>
     <div className="shrink-0 border-b px-4 py-2.5 space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="flex rounded-xl border border-border/60 overflow-hidden">
+          <button type="button" onClick={()=>setAgendaMode("list")} className={agendaMode==="list"?"tf-chip-active px-3 py-1.5 text-xs font-medium":"px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"}>Список</button>
+          <button type="button" onClick={()=>setAgendaMode("timeline")} className={agendaMode==="timeline"?"tf-chip-active px-3 py-1.5 text-xs font-medium":"px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"}>Сетка</button>
+        </div>
+      </div>
       <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Поиск задач…" className="h-9 w-full rounded-xl border border-input bg-card/60 px-3 text-sm outline-none backdrop-blur focus:ring-2 focus:ring-ring"/>
       {agendaTags.length>0&&<div className="flex flex-wrap gap-1.5">{["",...agendaTags.map(t=>t.id)].map(id=>{const tag=agendaTags.find(t=>t.id===id);const active=id===""?activeTag==="":activeTag===id;return <button key={id||"all"} type="button" onClick={()=>setActiveTag(id)} className={cn("text-xs px-3 py-1.5 rounded-full border transition-all",active?"tf-chip-active":"tf-chip")}>{tag ? (<span className="inline-flex items-center gap-1"><TagIcon icon={tag.icon} />{tag.name}</span>) : "Все"}</button>;})}</div>}
       <div className="grid grid-cols-7 gap-1.5">
@@ -119,7 +227,10 @@ export function AgendaView(){
       </div>
       {dayBirthdays.length>0&&<div className="flex flex-wrap gap-1.5">{dayBirthdays.map(b=><span key={b.id} className="inline-flex items-center gap-1 rounded-full border border-pink-500/40 bg-pink-500/10 px-2.5 py-1 text-[11px] text-pink-300" style={{boxShadow:"0 0 10px -3px #ec489988"}}>🎂 {b.name}</span>)}</div>}
     </div>
+    <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_300px]">
+    <div className="flex min-h-0 min-w-0 flex-col">
     <div className="flex-1 overflow-y-auto">
+    {agendaMode==="timeline" ? (<>
       <div className="px-4 py-3 border-b min-h-[64px]" onDragOver={e=>e.preventDefault()} onDrop={dropAllDay}><p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Весь день · перетащите задачу сюда или на время</p><div className="space-y-1.5">{allDay.map(t=><AgendaCard key={t.id} task={t} selected={selectedTaskId===t.id} onSelect={()=>setSelectedTask(t.id)} onComplete={()=>completeTask(t.id)} onDragStart={onDragStart}/>)}</div></div>
       <div className="relative px-2 py-2" style={{height:(END_HOUR-START_HOUR)*HOUR_HEIGHT+16}}>
         <div className="absolute left-2 right-2 top-2" style={{height:(END_HOUR-START_HOUR)*HOUR_HEIGHT}}>
@@ -128,10 +239,25 @@ export function AgendaView(){
           <div className="absolute left-14 right-0 top-0" style={{height:(END_HOUR-START_HOUR)*HOUR_HEIGHT}}>{timed.map(t=><TimedAgendaCard key={t.id} task={t} day={day} layout={layout.get(t.id)||{column:0,columns:1}} selected={selectedTaskId===t.id} onSelect={()=>setSelectedTask(t.id)} onComplete={()=>completeTask(t.id)} onDragStart={onDragStart}/>)}</div>
         </div>
       </div>
-      {dayTasks.length===0&&<div className="flex flex-col items-center justify-center py-16 text-muted-foreground"><CalIcon className="h-8 w-8 mb-2 opacity-40"/><p className="text-sm">Нет задач на этот день</p><p className="text-xs mt-1">Назначьте срок задаче, чтобы увидеть её здесь</p></div>}
+      {dayTasks.length===0&&agendaMode==="timeline"&&<div className="flex flex-col items-center justify-center py-16 text-muted-foreground"><CalIcon className="h-8 w-8 mb-2 opacity-40"/><p className="text-sm">Нет задач на этот день</p><p className="text-xs mt-1">Назначьте срок задаче, чтобы увидеть её здесь</p></div>}
+    </> ) : (
+      <AgendaListView tasks={dayTasks} day={day} />
+    )}
     </div>
     <div className="shrink-0 border-t px-4 py-2.5">
       <button type="button" onClick={()=>setTaskOpen(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/40 px-3 py-2.5 text-sm text-primary transition-colors hover:bg-primary/10"><span className="text-base leading-none">+</span>Добавить задачу</button>
+    </div>
+    </div>
+    <div className="hidden min-h-0 min-w-0 flex-col gap-4 overflow-y-auto border-l border-border/50 p-4 lg:flex">
+      <QuickGlance />
+      <MiniCalendar
+        value={day}
+        onSelect={(d) => { const now=new Date(); setDayOffset(Math.round((startOfDay(d).getTime()-startOfDay(now).getTime())/86400000)); }}
+        taskKeys={new Set([...tasks,...todayTasks].flatMap((t:any)=>{const keys:string[]=[];for(const raw of [t.startDate,t.dueDate]){if(!raw)continue;const d=new Date(raw);keys.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);}return keys;}))}
+        birthdayKeys={new Set(birthdays.map((b:any)=>{const d=new Date(b.date);return `${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}))}
+      />
+      <UpcomingBirthdays limit={3} />
+    </div>
     </div>
     <CreateTaskModal open={taskOpen} onClose={()=>setTaskOpen(false)} initialDate={dayKey} />
   </div>;

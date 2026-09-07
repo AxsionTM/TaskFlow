@@ -27,7 +27,7 @@ import { Calendar, Plus, GripVertical } from 'lucide-react';
 const COLUMNS = [
   { id: 'TODO', title: 'К выполнению', color: 'border-t-violet-500', tint: '#a855f7' },
   { id: 'IN_PROGRESS', title: 'В работе', color: 'border-t-blue-500', tint: '#3b82f6' },
-  { id: 'COMPLETED', title: 'Готово', color: 'border-t-green-500', tint: '#22c55e' },
+  { id: 'COMPLETED', title: 'Выполнено', color: 'border-t-green-500', tint: '#22c55e' },
 ];
 
 function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
@@ -136,7 +136,10 @@ function Column({
         col.color,
         isOver && 'ring-2 ring-primary/30'
       )}
-      style={{ boxShadow: `0 0 28px -10px ${(col as any).tint || '#888888'}` }}
+      style={{
+        boxShadow: `0 0 28px -10px ${(col as any).tint || '#888888'}`,
+        background: `linear-gradient(180deg, ${(col as any).tint}14, transparent 40%), hsl(var(--card) / 0.62)`,
+      }}
     >
       <div className="flex items-center justify-between px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -274,6 +277,13 @@ export function KanbanBoard() {
               onAdd={() => handleQuickAdd(col.id)}
             />
           ))}
+          <div className="tf-glass hidden w-72 shrink-0 self-center rounded-2xl p-4 text-center xl:block">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Двигайся к цели
+              <br />
+              шаг за шагом
+            </p>
+          </div>
         </div>
       </div>
 
