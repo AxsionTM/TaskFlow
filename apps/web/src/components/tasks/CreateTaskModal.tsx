@@ -29,18 +29,20 @@ function toIso(date: string, time: string) {
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** Дата YYYY-MM-DD для предзаполнения срока (календарь, повестка) */
+  initialDate?: string;
 }
 
-export function CreateTaskModal({ open, onClose }: Props) {
+export function CreateTaskModal({ open, onClose, initialDate }: Props) {
   const { createTask, currentProjectId, refreshCurrentView } = useTasksStore();
   const { projects, fetchProjects } = useProjectsStore();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('NONE');
   const [projectId, setProjectId] = useState('');
-  const [startDate, setStartDate] = useState('');
+  const [startDate, setStartDate] = useState(initialDate || '');
   const [startTime, setStartTime] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState(initialDate || '');
   const [dueTime, setDueTime] = useState('');
   const [tags, setTags] = useState<any[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -60,8 +62,10 @@ export function CreateTaskModal({ open, onClose }: Props) {
     if (!open) return;
     fetchProjects();
     setProjectId(currentProjectId || '');
+    setStartDate(initialDate || '');
+    setDueDate(initialDate || '');
     api.getTags().then(({ tags: t }) => setTags(t)).catch(() => {});
-  }, [open, currentProjectId, fetchProjects]);
+  }, [open, currentProjectId, fetchProjects, initialDate]);
 
   // Поле описания растет вместе с текстом вместо 2 строк со скроллом.
   useEffect(() => {
@@ -76,9 +80,9 @@ export function CreateTaskModal({ open, onClose }: Props) {
     setDescription('');
     setPriority('NONE');
     setProjectId(currentProjectId || '');
-    setStartDate('');
+    setStartDate(initialDate || '');
     setStartTime('');
-    setDueDate('');
+    setDueDate(initialDate || '');
     setDueTime('');
     setSelectedTagIds([]);
     setNewTag('');

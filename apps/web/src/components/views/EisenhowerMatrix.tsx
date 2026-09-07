@@ -120,6 +120,8 @@ function MatrixCard({ task }: { task: any }) {
           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
             <Calendar className="h-2.5 w-2.5" />
             {formatDate(task.dueDate)}
+            {task.isAllDay === false &&
+              ` · ${new Date(task.startDate || task.dueDate).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}
           </span>
         )}
       </div>
@@ -166,8 +168,20 @@ export function EisenhowerMatrix() {
             style={{ boxShadow: glow[q.id], borderWidth: 1.5 }}
           >
             <div className="px-3 py-2 border-b border-border/50 flex items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{
+                  backgroundColor: q.id === 'do' ? '#ef4444' : q.id === 'schedule' ? '#3b82f6' : q.id === 'delegate' ? '#f59e0b' : '#9ca3af',
+                  boxShadow: '0 0 8px -1px currentColor',
+                }}
+              />
               <div className="flex-1">
-                <h3 className="text-sm font-semibold">{q.title}</h3>
+                <h3
+                  className="text-sm font-semibold"
+                  style={{ color: q.id === 'do' ? '#ef4444' : q.id === 'schedule' ? '#3b82f6' : q.id === 'delegate' ? '#f59e0b' : undefined }}
+                >
+                  {q.title}
+                </h3>
                 <p className="text-[11px] text-muted-foreground">{q.subtitle}</p>
               </div>
               <span className="text-[11px] font-semibold tabular-nums rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5">

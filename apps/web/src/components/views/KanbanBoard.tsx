@@ -25,9 +25,9 @@ import { TagPill } from '@/components/tasks/TagPill';
 import { Calendar, Plus, GripVertical } from 'lucide-react';
 
 const COLUMNS = [
-  { id: 'TODO', title: 'К выполнению', color: 'border-t-gray-400' },
-  { id: 'IN_PROGRESS', title: 'В работе', color: 'border-t-blue-500' },
-  { id: 'COMPLETED', title: 'Готово', color: 'border-t-green-500' },
+  { id: 'TODO', title: 'К выполнению', color: 'border-t-violet-500', tint: '#a855f7' },
+  { id: 'IN_PROGRESS', title: 'В работе', color: 'border-t-blue-500', tint: '#3b82f6' },
+  { id: 'COMPLETED', title: 'Готово', color: 'border-t-green-500', tint: '#22c55e' },
 ];
 
 function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
@@ -136,11 +136,19 @@ function Column({
         col.color,
         isOver && 'ring-2 ring-primary/30'
       )}
+      style={{ boxShadow: `0 0 28px -10px ${(col as any).tint || '#888888'}` }}
     >
       <div className="flex items-center justify-between px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold">{col.title}</h3>
-          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+          <h3 className="text-sm font-semibold" style={{ color: (col as any).tint }}>{col.title}</h3>
+          <span
+            className="text-xs font-semibold px-2 py-0.5 rounded-full tabular-nums"
+            style={{
+              color: (col as any).tint,
+              background: `${(col as any).tint}1a`,
+              border: `1px solid ${(col as any).tint}55`,
+            }}
+          >
             {tasks.length}
           </span>
         </div>

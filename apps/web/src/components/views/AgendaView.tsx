@@ -2,12 +2,45 @@
 
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useTasksStore } from "@/stores/tasks";
+import { useBirthdaysStore, isSameMonthDay } from "@/stores/birthdays";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { TagPill } from "@/components/tasks/TagPill";
 import { TagIcon } from "@/components/tasks/TagIcon";
+import { CreateTaskModal } from "@/components/tasks/CreateTaskModal";
 import { ChevronLeft, ChevronRight, Calendar as CalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const PRIORITY_PILL: Record<string, { label: string; color: string }> = {
+  HIGH: { label: "Высокий", color: "#ef4444" },
+  MEDIUM: { label: "Средний", color: "#3b82f6" },
+  LOW: { label: "Низкий", color: "#22c55e" },
+};
+
+function PriorityPill({ priority }: { priority?: string | null }) {
+  if (!priority || priority === "NONE") return null;
+  const p = PRIORITY_PILL[priority];
+  if (!p) return null;
+  return (
+    <span
+      className="tf-tag inline-block"
+      style={{
+        border: `1px solid ${p.color}99`,
+        color: p.color,
+        backgroundColor: `${p.color}1f`,
+        boxShadow: `0 0 10px -3px ${p.color}88`,
+        fontWeight: 600,
+      }}
+    >
+      {p.label}
+    </span>
+  );
+}
+
+function subCount(task: any): number {
+  if (Array.isArray(task.children)) return task.children.length;
+  return task._count?.children ?? 0;
+}
 
 const START_HOUR=7, END_HOUR=22, HOUR_HEIGHT=72;
 function startOfDay(d:Date){const x=new Date(d);x.setHours(0,0,0,0);return x;}
@@ -60,9 +93,13 @@ function buildTimedLayout(tasks:any[], day:Date){
 
 export function AgendaView(){
   const {tasks,todayTasks,overdueTasks,setSelectedTask,completeTask,selectedTaskId,fetchTasks,fetchToday,fetchOverdue,updateTask}=useTasksStore();
-  const [dayOffset,setDayOffset]=useState(0);const [dragOverMinute,setDragOverMinute]=useState<number|null>(null);const [query,setQuery]=useState("");const [activeTag,setActiveTag]=useState("");
-  useEffect(()=>{fetchTasks({includeCompleted:"false"});fetchToday();fetchOverdue();},[fetchTasks,fetchToday,fetchOverdue]);
+  const [dayOffset,setDayOffset]=useState(0);const [dragOverMinute,setDragOverMinute]=useState<number|null>(null);  const [query,setQuery]=useState("");const [activeTag,setActiveTag]=useState("");const [taskOpen,setTaskOpen]=useState(false);
+  const { items: birthdays, fetch: fetchBirthdays } = useBirthdaysStore();
+  useEffect(()=>{fetchTasks({includeCompleted:"false"});fetchToday();fetchOverdue();fetchBirthdays();},[fetchTasks,fetchToday,fetchOverdue,fetchBirthdays]);
   const day=useMemo(()=>{const d=new Date();d.setDate(d.getDate()+dayOffset);return startOfDay(d);},[dayOffset]);
+  const weekStrip=useMemo(()=>{const now=new Date();const dow=(now.getDay()+6)%7;const monday=new Date(now);monday.setDate(now.getDate()-dow);return Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);const off=Math.round((startOfDay(d).getTime()-startOfDay(now).getTime())/86400000);return {date:d,offset:off,wd:d.toLocaleDateString("ru-RU",{weekday:"short"}),num:d.getDate()};});},[]);
+  const dayKey=`${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,"0")}-${String(day.getDate()).padStart(2,"0")}`;
+  const dayBirthdays=useMemo(()=>birthdays.filter(b=>isSameMonthDay(b.date,day)),[birthdays,day]);
   const label=dayLabel(day);
   const dayTasksBase=useMemo(()=>{const all=[...tasks,...todayTasks,...overdueTasks],seen=new Set<string>(),list:any[]=[];const dayStart=new Date(day),dayEnd=new Date(day);dayEnd.setHours(23,59,59,999);for(const t of all){if(seen.has(t.id)||t.status==="COMPLETED"||t.parentId)continue;const start=t.startDate?new Date(t.startDate):null,due=t.dueDate?new Date(t.dueDate):null;if(!start&&!due)continue;const visible=(start?start<=dayEnd:true)&&(due?due>=dayStart:true);if(visible){seen.add(t.id);list.push(t);}}return list;},[tasks,todayTasks,overdueTasks,day]);
   const agendaTags=useMemo(()=>{const m=new Map<string,{id:string;name:string;color:string;icon?:string|null}>();for(const t of dayTasksBase){for(const tt of t.tags||[]){const id=tt.tag?.id||tt.tagId;if(!id||m.has(id))continue;m.set(id,{id,name:tt.tag?.name||"Тег",color:tt.tag?.color||"#888888",icon:tt.tag?.icon||null});}}return Array.from(m.values());},[dayTasksBase]);
@@ -77,6 +114,10 @@ export function AgendaView(){
     <div className="shrink-0 border-b px-4 py-2.5 space-y-2">
       <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Поиск задач…" className="h-9 w-full rounded-xl border border-input bg-card/60 px-3 text-sm outline-none backdrop-blur focus:ring-2 focus:ring-ring"/>
       {agendaTags.length>0&&<div className="flex flex-wrap gap-1.5">{["",...agendaTags.map(t=>t.id)].map(id=>{const tag=agendaTags.find(t=>t.id===id);const active=id===""?activeTag==="":activeTag===id;return <button key={id||"all"} type="button" onClick={()=>setActiveTag(id)} className={cn("text-xs px-3 py-1.5 rounded-full border transition-all",active?"tf-chip-active":"tf-chip")}>{tag ? (<span className="inline-flex items-center gap-1"><TagIcon icon={tag.icon} />{tag.name}</span>) : "Все"}</button>;})}</div>}
+      <div className="grid grid-cols-7 gap-1.5">
+        {weekStrip.map(w=>{const active=startOfDay(w.date).getTime()===day.getTime();const isToday=w.offset===0;return <button key={w.offset} type="button" onClick={()=>setDayOffset(w.offset)} className={cn("rounded-xl border px-1 py-1.5 text-center transition-all",active?"tf-chip-active":"tf-chip")}><span className="block text-[10px] capitalize opacity-80">{w.wd}</span><span className={cn("block text-sm font-semibold tabular-nums",isToday&&!active&&"text-primary")}>{w.num}</span></button>;})}
+      </div>
+      {dayBirthdays.length>0&&<div className="flex flex-wrap gap-1.5">{dayBirthdays.map(b=><span key={b.id} className="inline-flex items-center gap-1 rounded-full border border-pink-500/40 bg-pink-500/10 px-2.5 py-1 text-[11px] text-pink-300" style={{boxShadow:"0 0 10px -3px #ec489988"}}>🎂 {b.name}</span>)}</div>}
     </div>
     <div className="flex-1 overflow-y-auto">
       <div className="px-4 py-3 border-b min-h-[64px]" onDragOver={e=>e.preventDefault()} onDrop={dropAllDay}><p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Весь день · перетащите задачу сюда или на время</p><div className="space-y-1.5">{allDay.map(t=><AgendaCard key={t.id} task={t} selected={selectedTaskId===t.id} onSelect={()=>setSelectedTask(t.id)} onComplete={()=>completeTask(t.id)} onDragStart={onDragStart}/>)}</div></div>
@@ -89,11 +130,15 @@ export function AgendaView(){
       </div>
       {dayTasks.length===0&&<div className="flex flex-col items-center justify-center py-16 text-muted-foreground"><CalIcon className="h-8 w-8 mb-2 opacity-40"/><p className="text-sm">Нет задач на этот день</p><p className="text-xs mt-1">Назначьте срок задаче, чтобы увидеть её здесь</p></div>}
     </div>
+    <div className="shrink-0 border-t px-4 py-2.5">
+      <button type="button" onClick={()=>setTaskOpen(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/40 px-3 py-2.5 text-sm text-primary transition-colors hover:bg-primary/10"><span className="text-base leading-none">+</span>Добавить задачу</button>
+    </div>
+    <CreateTaskModal open={taskOpen} onClose={()=>setTaskOpen(false)} initialDate={dayKey} />
   </div>;
 }
 
 function TimedAgendaCard({task,day,layout,selected,onSelect,onComplete,onDragStart}:{task:any;day:Date;layout:Layout;selected:boolean;onSelect:()=>void;onComplete:()=>void;onDragStart:(e:DragEvent,id:string)=>void}){
   const start=task.startDate?new Date(task.startDate):task.dueDate?new Date(task.dueDate):new Date(day),end=task.dueDate?new Date(task.dueDate):new Date(start.getTime()+3600000);const dayStart=new Date(day);dayStart.setHours(0,0,0,0);const dayEnd=new Date(day);dayEnd.setHours(23,59,59,999);const visibleStart=new Date(Math.max(start.getTime(),dayStart.getTime())),visibleEnd=new Date(Math.min(end.getTime(),dayEnd.getTime()));const from=Math.max(START_HOUR*60,minuteOfDay(visibleStart)),to=Math.min(END_HOUR*60,minuteOfDay(visibleEnd)),duration=Math.max(30,to-from),top=((from-START_HOUR*60)/60)*HOUR_HEIGHT,height=Math.max(42,(duration/60)*HOUR_HEIGHT-4),time=`${start.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})} – ${end.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}`,gap=6;
-  return <div draggable onDragStart={e=>onDragStart(e,task.id)} onClick={onSelect} className={cn("absolute rounded-xl tf-glass overflow-hidden cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-shadow",selected&&"ring-2 ring-primary/40")} style={{top,height,left:`calc(${(layout.column/layout.columns)*100}% + ${gap/2}px)`,width:`calc(${100/layout.columns}% - ${gap}px)`}}><div className="h-full flex"><div className="w-1 shrink-0" style={{backgroundColor:task.project?.color||"#4A90D9"}}/><div className="flex-1 px-3 py-2 min-w-0"><p className="text-[11px] font-medium text-muted-foreground mb-0.5">{time}</p><div className="flex items-center gap-2"><div onClick={e=>{e.stopPropagation();onComplete()}}><Checkbox checked={task.status==="COMPLETED"} priority={task.priority} className="tf-check-glow"/></div><p className="text-sm font-medium truncate">{task.title}</p></div>{task.tags?.[0] && <TagPill tag={task.tags[0].tag} className="ml-6 mt-1" />}{task.project&&<p className="text-[11px] text-muted-foreground mt-0.5 truncate pl-6">{task.project.name}</p>}</div></div></div>;
+  return <div draggable onDragStart={e=>onDragStart(e,task.id)} onClick={onSelect} className={cn("absolute rounded-xl tf-glass overflow-hidden cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-shadow",selected&&"ring-2 ring-primary/40")} style={{top,height,left:`calc(${(layout.column/layout.columns)*100}% + ${gap/2}px)`,width:`calc(${100/layout.columns}% - ${gap}px)`}}><div className="h-full flex"><div className="w-1 shrink-0" style={{backgroundColor:task.project?.color||"#4A90D9"}}/><div className="flex-1 px-3 py-2 min-w-0"><p className="text-[11px] font-medium text-muted-foreground mb-0.5">{time}</p><div className="flex items-center gap-2"><div onClick={e=>{e.stopPropagation();onComplete()}}><Checkbox checked={task.status==="COMPLETED"} priority={task.priority} className="tf-check-glow"/></div><p className="text-sm font-medium truncate">{task.title}</p></div><div className="mt-1 flex items-center gap-1.5 pl-6"><PriorityPill priority={task.priority}/>{subCount(task)>0&&<span className="text-[10px] text-muted-foreground">· {subCount(task)} подзадач</span>}</div>{task.tags?.[0] && <TagPill tag={task.tags[0].tag} className="ml-6 mt-1" />}{task.project&&<p className="text-[11px] text-muted-foreground mt-0.5 truncate pl-6">{task.project.name}</p>}</div></div></div>;
 }
-function AgendaCard({task,selected,onSelect,onComplete,onDragStart}:{task:any;selected:boolean;onSelect:()=>void;onComplete:()=>void;onDragStart:(e:DragEvent,id:string)=>void}){return <div draggable onDragStart={e=>onDragStart(e,task.id)} onClick={onSelect} className={cn("group flex items-stretch rounded-xl tf-glass overflow-hidden cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md",selected&&"ring-2 ring-primary/40")}><div className="w-1 shrink-0" style={{backgroundColor:task.project?.color||"#4A90D9"}}/><div className="flex-1 px-3 py-2 min-w-0"><div className="flex items-center gap-2"><div onClick={e=>{e.stopPropagation();onComplete()}}><Checkbox checked={task.status==="COMPLETED"} priority={task.priority} className="tf-check-glow"/></div><p className="text-sm font-medium truncate">{task.title}</p></div>{task.tags?.[0] && <TagPill tag={task.tags[0].tag} className="ml-6 mt-1" />}</div></div>}
+function AgendaCard({task,selected,onSelect,onComplete,onDragStart}:{task:any;selected:boolean;onSelect:()=>void;onComplete:()=>void;onDragStart:(e:DragEvent,id:string)=>void}){return <div draggable onDragStart={e=>onDragStart(e,task.id)} onClick={onSelect} className={cn("group flex items-stretch rounded-xl tf-glass overflow-hidden cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md",selected&&"ring-2 ring-primary/40")}><div className="w-1 shrink-0" style={{backgroundColor:task.project?.color||"#4A90D9"}}/><div className="flex-1 px-3 py-2 min-w-0"><div className="flex items-center gap-2"><div onClick={e=>{e.stopPropagation();onComplete()}}><Checkbox checked={task.status==="COMPLETED"} priority={task.priority} className="tf-check-glow"/></div><p className="text-sm font-medium truncate">{task.title}</p></div><div className="mt-1 flex items-center gap-1.5 pl-6"><PriorityPill priority={task.priority}/>{subCount(task)>0&&<span className="text-[10px] text-muted-foreground">· {subCount(task)} подзадач</span>}</div>{task.tags?.[0] && <TagPill tag={task.tags[0].tag} className="ml-6 mt-1" />}</div></div>}

@@ -12,6 +12,8 @@ export function BirthdaysView() {
   const [date, setDate] = useState('');
   const [note, setNote] = useState('');
   const [remindDays, setRemindDays] = useState(0);
+  const [showForm, setShowForm] = useState(false);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     fetch();
@@ -25,7 +27,12 @@ export function BirthdaysView() {
     setDate('');
     setNote('');
     setRemindDays(0);
+    setShowForm(false);
   };
+
+  const visible = items.filter((b) =>
+    b.name.toLowerCase().includes(query.trim().toLowerCase())
+  );
 
   const daysUntil = (iso: string): number => {
     const now = new Date();
@@ -41,14 +48,30 @@ export function BirthdaysView() {
     <div className="flex-1 overflow-y-auto p-4 md:p-6 max-w-2xl mx-auto w-full">
       <div className="flex items-center gap-2 mb-4">
         <Cake className="h-5 w-5 text-primary" />
-        <div>
+        <div className="flex-1">
           <h1 className="text-lg font-semibold">Дни рождения</h1>
           <p className="text-xs text-muted-foreground">
             Ближайшие события
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowForm((v) => !v)}
+          title="Добавить день рождения"
+          className="tf-btn-violet flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-bold leading-none"
+        >
+          +
+        </button>
       </div>
 
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Поиск…"
+        className="mb-4 h-9 w-full rounded-xl border border-input bg-card/60 px-3 text-sm outline-none backdrop-blur focus:ring-2 focus:ring-ring"
+      />
+
+      {showForm && (
       <form onSubmit={submit} className="tf-glass rounded-2xl p-4 space-y-3 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <Input placeholder="Имя" value={name} onChange={(e) => setName(e.target.value)} />
@@ -72,10 +95,11 @@ export function BirthdaysView() {
           </Button>
         </div>
       </form>
+      )}
 
       {loading && <p className="text-sm text-muted-foreground">Загрузка…</p>}
       <div className="tf-glass rounded-2xl p-3 space-y-2">
-        {items.map((b) => {
+        {visible.map((b) => {
           const age = ageFromDate(b.date);
           const d = new Date(b.date);
           const left = daysUntil(b.date);
@@ -120,9 +144,9 @@ export function BirthdaysView() {
             </div>
           );
         })}
-        {!loading && items.length === 0 && (
+        {!loading && visible.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">
-            Пока пусто — добавьте первый день рождения
+            {query ? 'Ничего не найдено' : 'Пока пусто — добавьте первый день рождения'}
           </p>
         )}
       </div>

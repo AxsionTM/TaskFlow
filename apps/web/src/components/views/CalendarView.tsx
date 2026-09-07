@@ -23,6 +23,8 @@ import { useAuthStore } from '@/stores/auth';
 import { useEffectsStore } from '@/stores/effects';
 import { cn, priorityColors } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { CreateTaskModal } from '@/components/tasks/CreateTaskModal';
+import { TaskCard } from '@/components/tasks/TaskCard';
 
 type CalMode = 'month' | 'week';
 
@@ -42,6 +44,8 @@ export function CalendarView() {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [mode, setMode] = useState<CalMode>('month');
   const [cursor, setCursor] = useState(new Date());
+  const [selectedKey, setSelectedKey] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [taskOpen, setTaskOpen] = useState(false);
 
   const allTasks = useMemo(() => tasks, [tasks]);
 
@@ -166,13 +170,15 @@ export function CalendarView() {
               return (
                 <div
                   key={key}
+                  onClick={() => setSelectedKey(key)}
                   onDragOver={(e) => onDragOverDay(e, key)}
                   onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
                   onDrop={(e) => onDropDay(e, key)}
                   className={cn(
-                    'min-h-[90px] rounded-xl tf-glass p-1.5 transition-colors relative',
+                    'min-h-[90px] rounded-xl tf-glass p-1.5 transition-colors relative cursor-pointer',
                     !inMonth && 'opacity-40',
                     isToday(day) && 'ring-1 ring-primary/60 shadow-[0_0_18px_-6px_var(--tf-glow)]',
+                    selectedKey === key && 'ring-2 ring-primary/80',
                     dragOverKey === key && 'ring-2 ring-primary bg-primary/10'
                   )}
                 >
@@ -230,7 +236,7 @@ export function CalendarView() {
                         key={task.id}
                         draggable
                         onDragStart={(e) => onDragStart(e, task.id)}
-                        onClick={() => setSelectedTask(task.id)}
+                        onClick={(e) => { e.stopPropagation(); setSelectedTask(task.id); }}
                         className={cn(
                           'w-full text-left text-[11px] px-1.5 py-0.5 rounded-md truncate cursor-grab active:cursor-grabbing border border-primary/25',
                           'hover:opacity-80',
@@ -273,12 +279,14 @@ export function CalendarView() {
               return (
                 <div
                   key={key}
+                  onClick={() => setSelectedKey(key)}
                   onDragOver={(e) => onDragOverDay(e, key)}
                   onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
                   onDrop={(e) => onDropDay(e, key)}
                   className={cn(
-                    'flex flex-col rounded-2xl tf-glass overflow-hidden',
+                    'flex flex-col rounded-2xl tf-glass overflow-hidden cursor-pointer',
                     isToday(day) && 'ring-1 ring-primary/60 shadow-[0_0_18px_-6px_var(--tf-glow)]',
+                    selectedKey === key && 'ring-2 ring-primary/80',
                     dragOverKey === key && 'ring-2 ring-primary'
                   )}
                 >
@@ -301,7 +309,7 @@ export function CalendarView() {
                         key={task.id}
                         draggable
                         onDragStart={(e) => onDragStart(e, task.id)}
-                        onClick={() => setSelectedTask(task.id)}
+                        onClick={(e) => { e.stopPropagation(); setSelectedTask(task.id); }}
                         className={cn(
                           'w-full text-left text-xs px-2 py-1.5 rounded-xl cursor-grab active:cursor-grabbing border border-primary/20 bg-card/50',
                           task.status === 'COMPLETED'
@@ -322,6 +330,37 @@ export function CalendarView() {
           </div>
         </div>
       )}
+
+      {/* Выбранный день */}
+      <div className="shrink-0 border-t px-3 py-3 sm:px-4">
+        <div className="tf-glass mx-auto max-w-3xl rounded-2xl p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-sm font-semibold capitalize">
+              {format(new Date(selectedKey + 'T12:00:00'), 'd MMMM, EEEE', { locale: ru })}
+            </span>
+            <span className="text-[11px] text-muted-foreground tabular-nums">
+              {(tasksByDate.get(selectedKey) || []).length}
+            </span>
+          </div>
+          <div className="max-h-56 space-y-2 overflow-y-auto">
+            {(tasksByDate.get(selectedKey) || []).map((task: any) => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+            {(tasksByDate.get(selectedKey) || []).length === 0 && (
+              <p className="py-3 text-center text-xs text-muted-foreground">Нет задач в этот день</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setTaskOpen(true)}
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/40 px-3 py-2.5 text-sm text-primary transition-colors hover:bg-primary/10"
+          >
+            <span className="text-base leading-none">+</span>
+            Добавить задачу
+          </button>
+        </div>
+      </div>
+      <CreateTaskModal open={taskOpen} onClose={() => setTaskOpen(false)} initialDate={selectedKey} />
 
     </div>
   );
