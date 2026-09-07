@@ -131,7 +131,7 @@ export function TodayDashboard() {
                 <p className="text-xs mt-1">Добавьте первую задачу кнопкой выше</p>
               </div>
             ) : (
-              <div className="mt-1 space-y-0.5">
+              <div className="mt-1 divide-y divide-[hsl(var(--primary)/0.14)]">
                 {todayTasks.map((task) => (
                   <TaskItem key={task.id} task={task} />
                 ))}

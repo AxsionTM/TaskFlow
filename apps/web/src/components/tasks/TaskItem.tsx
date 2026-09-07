@@ -38,6 +38,11 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
       : currentView === 'tomorrow' && (task.startDate || task.dueDate)
       ? 'Завтра'
       : formatDate(task.dueDate || task.startDate);
+  const rawTime = task.startDate || task.dueDate;
+  const timeLabel =
+    rawTime && task.isAllDay === false
+      ? new Date(rawTime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+      : '';
 
   return (
     <div>
@@ -55,7 +60,13 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
             completeTask(task.id);
           }}
         >
-          <Checkbox checked={task.status === 'COMPLETED'} priority={depth > 0 ? 'NONE' : task.priority} className={cn('tf-check-glow', depth > 0 && 'border-violet-400 data-[checked]:bg-violet-500')} />
+          <Checkbox
+            checked={task.status === 'COMPLETED'}
+            priority={depth > 0 ? 'NONE' : task.priority}
+            ghost={depth === 0}
+            size={depth === 0 ? 'md' : 'sm'}
+            className={cn('tf-check-glow', depth > 0 && 'border-violet-400 data-[checked]:bg-violet-500')}
+          />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -83,7 +94,11 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
                 )}
               >
                 <Calendar className="h-3 w-3" />
-                {isOverdue ? 'Просрочено' : isTimeLateToday ? `${contextualDateLabel} · время прошло` : contextualDateLabel}
+                {isOverdue
+                  ? `Просрочено${timeLabel ? ` · ${timeLabel}` : ''}`
+                  : isTimeLateToday
+                  ? `${contextualDateLabel} · время прошло`
+                  : `${contextualDateLabel}${timeLabel ? ` · ${timeLabel}` : ''}`}
               </span>
             )}
             {task.tags?.map((tt: any) => {
@@ -92,12 +107,14 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
                 <span
                   key={tt.tag?.id || tt.tagId}
                   className="tf-tag"
-                  style={{
-                    border: `1px solid ${color}99`,
-                    color,
-                    backgroundColor: `${color}1f`,
-                    boxShadow: `0 0 10px -3px ${color}88`,
-                  }}
+                style={{
+                  border: `1px solid ${color}cc`,
+                  color,
+                  backgroundColor: `${color}26`,
+                  boxShadow: `0 0 14px -2px ${color}aa, inset 0 0 8px -4px ${color}66`,
+                  textShadow: `0 0 8px ${color}88`,
+                  fontWeight: 600,
+                }}
                 >
                   {tt.tag?.name}
                 </span>

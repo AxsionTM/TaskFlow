@@ -63,10 +63,12 @@ export function TaskCard({ task }: { task: any }) {
           <span
             className="tf-tag mt-1 inline-block"
             style={{
-              border: `1px solid ${color}99`,
+              border: `1px solid ${color}cc`,
               color,
-              backgroundColor: `${color}1f`,
-              boxShadow: `0 0 10px -3px ${color}88`,
+              backgroundColor: `${color}26`,
+              boxShadow: `0 0 14px -2px ${color}aa, inset 0 0 8px -4px ${color}66`,
+              textShadow: `0 0 8px ${color}88`,
+              fontWeight: 600,
             }}
           >
             {tagName}

@@ -49,7 +49,7 @@ interface PointNode extends GraphNode {
   fixed?: boolean;
 }
 interface Camera { x: number; y: number; zoom: number }
-interface Props { nodes: GraphNode[]; edges: GraphEdge[]; onOpenTask?: (taskId: string) => void }
+interface Props { nodes: GraphNode[]; edges: GraphEdge[]; onOpenTask?: (taskId: string) => void; hideTimeline?: boolean; colorMode?: 'priority' | 'cluster' }
 
 const PRIORITY_COLOR: Record<string, string> = {
   HIGH: '#ef4444',
@@ -67,7 +67,7 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-export function ObsidianGraph({ nodes, edges, onOpenTask }: Props) {
+export function ObsidianGraph({ nodes, edges, onOpenTask, hideTimeline, colorMode }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const pointsRef = useRef<PointNode[]>([]);
@@ -118,7 +118,7 @@ export function ObsidianGraph({ nodes, edges, onOpenTask }: Props) {
     return [...dates, ...tasks];
   }, [dateNodes, taskNodes, visibleTaskIds, q]);
   const visibleIds = useMemo(() => new Set(visibleNodes.map(n => n.id)), [visibleNodes]);
-  const visibleEdges = useMemo(() => edges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target)), [edges, visibleIds]);
+  const visibleEdges = useMemo(() => edges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target) && (!hideTimeline || e.type !== 'timeline')), [edges, visibleIds, hideTimeline]);
   const selected = useMemo(() => nodes.find(n => n.id === selectedId) ?? null, [nodes, selectedId]);
   const neighbors = useMemo(() => {
     if (!selectedId) return new Set<string>();
@@ -244,7 +244,8 @@ export function ObsidianGraph({ nodes, edges, onOpenTask }: Props) {
         const scale=Math.max(.75,Math.min(1.2,camera.zoom));
         const depth=point.type==='date'?1:0.85+(point.pageRank??0)*.35;
         const radius=point.radius*depth*(focus?1.35:1)*scale;
-        const color=point.type==='date'?point.color:(point.isSubtask?(point.subtaskColor||SUBTASK_COLOR):(PRIORITY_COLOR[point.priority||'NONE']||PRIORITY_COLOR.NONE));
+        const clusterColor=colorMode==='cluster'&&point.clusterColor?point.clusterColor:null;
+        const color=point.type==='date'?point.color:(point.isSubtask?(point.subtaskColor||SUBTASK_COLOR):(clusterColor||PRIORITY_COLOR[point.priority||'NONE']||PRIORITY_COLOR.NONE));
         if(point.type==='date'){ctx.beginPath();ctx.arc(screen.x,screen.y,radius+(point.isToday?11:6),0,Math.PI*2);ctx.fillStyle=color;ctx.globalAlpha=dimmed?.04:point.isToday?.13:.08;ctx.fill();}
         ctx.save();ctx.shadowBlur=focus?24:14;ctx.shadowColor=hexToRgba(color,dimmed?.08:.45);
         const gradient=ctx.createRadialGradient(screen.x-radius*.35,screen.y-radius*.4,Math.max(1,radius*.08),screen.x,screen.y,Math.max(2,radius));
@@ -256,7 +257,7 @@ export function ObsidianGraph({ nodes, edges, onOpenTask }: Props) {
       ctx.globalAlpha=1;animationRef.current=requestAnimationFrame(simulate);
     };
     animationRef.current=requestAnimationFrame(simulate);return()=>{if(animationRef.current)cancelAnimationFrame(animationRef.current);};
-  }, [visibleEdges,visibleIds,running,neighbors]);
+  }, [visibleEdges,visibleIds,running,neighbors,colorMode]);
 
   const screenToWorld=(clientX:number,clientY:number)=>{const canvas=canvasRef.current!;const rect=canvas.getBoundingClientRect(),camera=cameraRef.current;return{x:(clientX-rect.left-rect.width/2)/camera.zoom+camera.x,y:(clientY-rect.top-rect.height/2)/camera.zoom+camera.y};};
   const findNode=(clientX:number,clientY:number)=>{const {x,y}=screenToWorld(clientX,clientY);let closest:PointNode|null=null,closestDistance=Infinity;for(const p of pointsRef.current){if(!visibleIds.has(p.id))continue;const d=Math.hypot(p.x-x,p.y-y),hit=Math.max(14/cameraRef.current.zoom,p.radius+10);if(d<=hit&&d<closestDistance){closest=p;closestDistance=d;}}return closest;};
