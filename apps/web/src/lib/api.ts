@@ -159,7 +159,7 @@ class ApiClient {
     return this.request<{ tags: any[] }>('/tags');
   }
 
-  createTag(data: any) {
+  createTag(data: { name: string; color?: string; icon?: string | null }) {
     return this.request<{ tag: any }>('/tags', { method: 'POST', body: JSON.stringify(data) });
   }
 

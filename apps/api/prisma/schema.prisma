@@ -195,6 +195,7 @@ model Tag {
   id        String   @id @default(cuid())
   name      String
   color     String   @default("#808080")
+  icon      String?
   userId    String
   projectId String?
   createdAt DateTime @default(now())

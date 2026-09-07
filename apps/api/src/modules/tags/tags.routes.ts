@@ -7,19 +7,24 @@ import { AuthRequest } from '../../common/middleware/auth';
 const router = Router();
 
 const DEFAULT_TAGS = [
-  { name: 'работа', color: '#3B82F6' },
-  { name: 'дом', color: '#10B981' },
-  { name: 'зал', color: '#F59E0B' },
-  { name: 'учёба', color: '#8B5CF6' },
-  { name: 'личное', color: '#EC4899' },
+  { name: 'Работа', color: '#ef4444', icon: '💼' },
+  { name: 'Здоровье', color: '#22c55e', icon: '💪' },
+  { name: 'Личное', color: '#a855f7', icon: '🔮' },
+  { name: 'Развитие', color: '#3b82f6', icon: '🌱' },
+  { name: 'Быт', color: '#f59e0b', icon: '🏠' },
+  { name: 'Дом', color: '#ec4899', icon: '🏡' },
 ];
 
+const TAG_PALETTE = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#22d3ee', '#fb7185'];
+
 async function ensureDefaultTags(userId: string) {
-  const count = await prisma.tag.count({ where: { userId } });
-  if (count > 0) return;
-  await prisma.tag.createMany({
-    data: DEFAULT_TAGS.map((t) => ({ ...t, userId })),
-  });
+  // Досеиваем недостающие базовые теги даже старым пользователям.
+  for (const t of DEFAULT_TAGS) {
+    const existing = await prisma.tag.findFirst({ where: { userId, name: t.name } });
+    if (!existing) {
+      await prisma.tag.create({ data: { ...t, userId } });
+    }
+  }
 }
 
 router.get('/', async (req: AuthRequest, res, next) => {
@@ -41,13 +46,17 @@ router.post('/', async (req: AuthRequest, res, next) => {
       .object({
         name: z.string().min(1),
         color: z.string().optional(),
+        icon: z.string().max(8).optional().nullable(),
       })
       .parse(req.body);
 
     const tag = await prisma.tag.create({
       data: {
         name: data.name,
-        color: data.color || '#808080',
+        color:
+          data.color ||
+          TAG_PALETTE[Math.floor(Math.random() * TAG_PALETTE.length)],
+        icon: data.icon || null,
         userId: req.userId!,
       },
     });

@@ -3,6 +3,7 @@
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn, formatDate } from '@/lib/utils';
+import { tagLabel } from '@/lib/tags';
 import { Calendar, Flag } from 'lucide-react';
 
 const FLAG_COLOR: Record<string, string> = {
@@ -116,8 +117,8 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
                   fontWeight: 600,
                 }}
                 >
-                  {tt.tag?.name}
-                </span>
+                {tagLabel(tt.tag)}
+              </span>
               );
             })}
             {task.project && (

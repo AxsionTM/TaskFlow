@@ -8,6 +8,7 @@ import { useTasksStore } from '@/stores/tasks';
 import { useProjectsStore } from '@/stores/projects';
 import { api } from '@/lib/api';
 import { cn, priorityLabels } from '@/lib/utils';
+import { TAG_COLORS, TAG_ICONS, randomTagColor, tagLabel } from '@/lib/tags';
 
 const PRIORITIES = [
   { value: 'NONE', label: 'Нет', color: 'text-emerald-500', bg: 'bg-emerald-600' },
@@ -43,6 +44,8 @@ export function CreateTaskModal({ open, onClose }: Props) {
   const [tags, setTags] = useState<any[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  const [newTagIcon, setNewTagIcon] = useState('');
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[4]);
   const [remindMinutes, setRemindMinutes] = useState<number | ''>('');
   const [remindRepeat, setRemindRepeat] = useState<number | ''>('');
   const [submitting, setSubmitting] = useState(false);
@@ -78,6 +81,8 @@ export function CreateTaskModal({ open, onClose }: Props) {
     setDueTime('');
     setSelectedTagIds([]);
     setNewTag('');
+    setNewTagIcon('');
+    setNewTagColor(TAG_COLORS[4]);
     setRemindMinutes('');
     setRemindRepeat('');
     setError('');
@@ -101,10 +106,16 @@ export function CreateTaskModal({ open, onClose }: Props) {
     const name = newTag.trim();
     if (!name) return;
     try {
-      const { tag } = await api.createTag({ name });
+      const { tag } = await api.createTag({
+        name,
+        color: newTagColor || randomTagColor(),
+        icon: newTagIcon || null,
+      });
       setTags((prev) => [...prev, tag]);
       setSelectedTagIds((prev) => [...prev, tag.id]);
       setNewTag('');
+      setNewTagIcon('');
+      setNewTagColor(TAG_COLORS[4]);
     } catch {}
   };
 
@@ -383,12 +394,29 @@ export function CreateTaskModal({ open, onClose }: Props) {
                         : undefined
                     }
                   >
-                    {tag.name}
+                    {tagLabel(tag)}
                   </button>
                 );
               })}
             </div>
             <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setNewTagIcon(newTagIcon ? '' : TAG_ICONS[0])}
+                title="Иконка тега"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-input bg-card text-base"
+              >
+                {newTagIcon || '🙂'}
+              </button>
+              <span
+                className="h-8 w-8 shrink-0 rounded-full border-2"
+                title="Цвет тега"
+                style={{
+                  backgroundColor: newTagColor,
+                  borderColor: `${newTagColor}66`,
+                  boxShadow: `0 0 10px -2px ${newTagColor}`,
+                }}
+              />
               <Input
                 placeholder="Новый тег"
                 value={newTag}
@@ -404,6 +432,40 @@ export function CreateTaskModal({ open, onClose }: Props) {
               <Button type="button" size="sm" variant="outline" className="h-8" onClick={addTag}>
                 +
               </Button>
+            </div>
+            {newTagIcon && (
+              <div className="mt-2 grid grid-cols-12 gap-1">
+                {TAG_ICONS.map((icon) => (
+                  <button
+                    key={icon}
+                    type="button"
+                    onClick={() => setNewTagIcon(icon)}
+                    className={cn(
+                      'flex h-7 items-center justify-center rounded-md border text-base transition-all',
+                      newTagIcon === icon
+                        ? 'border-primary bg-primary/15 scale-110'
+                        : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {TAG_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setNewTagColor(c)}
+                  title={c}
+                  className={cn(
+                    'h-5 w-5 rounded-full transition-transform',
+                    newTagColor === c && 'ring-2 ring-offset-2 ring-primary scale-110'
+                  )}
+                  style={{ backgroundColor: c, boxShadow: `0 0 8px -2px ${c}` }}
+                />
+              ))}
             </div>
           </div>
 

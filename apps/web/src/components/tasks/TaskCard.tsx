@@ -3,6 +3,7 @@
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { tagLabel } from '@/lib/tags';
 
 export const PRIORITY_TINT: Record<string, string> = {
   HIGH: '#ef4444',
@@ -23,7 +24,7 @@ export function TaskCard({ task }: { task: any }) {
   const { setSelectedTask, completeTask } = useTasksStore();
   const color =
     task.tags?.[0]?.tag?.color || task.project?.color || PRIORITY_TINT[task.priority || 'NONE'] || '#888888';
-  const tagName = task.tags?.[0]?.tag?.name || task.project?.name || '';
+  const tagName = task.tags?.[0]?.tag ? tagLabel(task.tags[0].tag) : task.project?.name || '';
   const letter = (task.title || '?').trim().slice(0, 1).toUpperCase();
 
   return (

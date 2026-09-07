@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatDate, cn } from '@/lib/utils';
+import { tagLabel } from '@/lib/tags';
 import { Calendar, Plus, GripVertical } from 'lucide-react';
 
 const COLUMNS = [
@@ -105,7 +106,7 @@ function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
                 boxShadow: `0 0 12px -3px ${(task.tags[0].tag?.color || '#888888')}aa`,
               }}
             >
-              {task.tags[0].tag?.name}
+              {tagLabel(task.tags[0].tag)}
             </span>
           )}
           {task.project && (

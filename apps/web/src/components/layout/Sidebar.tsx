@@ -408,6 +408,18 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               <Trash2 className="h-4 w-4" />
               Корзина
             </button>
+            <button
+              onClick={() => handleViewClick('profile')}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                currentView === 'profile'
+                  ? 'tf-nav-active'
+                  : 'text-foreground hover:bg-accent'
+              )}
+            >
+              <Settings className="h-4 w-4" />
+              Настройки
+            </button>
           </div>
         </nav>
 

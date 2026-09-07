@@ -8,7 +8,6 @@ import { useProjectsStore } from "@/stores/projects";
 import { useFocusStore } from "@/stores/focus";
 import { useEffectsStore } from "@/stores/effects";
 import { ThemePicker } from "@/components/ThemePicker";
-import { Logo } from "@/components/Logo";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
@@ -16,19 +15,32 @@ import {
   ListTodo,
   FolderKanban,
   Activity,
-  Sparkles,
-  Mail,
-  Shield,
+  Bell,
+  BellOff,
+  LogOut,
+  Pencil,
+  Check,
+  X,
+  RefreshCw,
 } from "lucide-react";
 
+type Tab = "profile" | "notifications" | "interface";
+
 export function ProfileView() {
-  const { user, setUser } = useAuthStore();
+  const { user, setUser, logout } = useAuthStore();
   const { tasks, overdueTasks, fetchTasks, fetchOverdue } = useTasksStore();
   const { goals, fetchGoals } = useGoalsStore();
   const { projects, fetchProjects } = useProjectsStore();
   const { stats, fetchStats } = useFocusStore();
   const { enabled: effectsOn, toggle: toggleEffects } = useEffectsStore();
   const [completed, setCompleted] = useState(0);
+  const [tab, setTab] = useState<Tab>("profile");
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [notifPerm, setNotifPerm] = useState<string>(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"
+  );
 
   useEffect(() => {
     fetchTasks({ includeCompleted: "true" });
@@ -41,6 +53,10 @@ export function ProfileView() {
   useEffect(() => {
     setCompleted(tasks.filter((t) => t.status === "COMPLETED").length);
   }, [tasks]);
+
+  useEffect(() => {
+    setName(user?.name || "");
+  }, [user?.name]);
 
   const total = tasks.length;
   const productivity = useMemo(() => {
@@ -55,220 +71,268 @@ export function ProfileView() {
     .slice(0, 2)
     .toUpperCase();
 
-  const activeGoals = goals.filter((g) => !g.isCompleted).slice(0, 3);
+  const saveName = async () => {
+    if (!name.trim()) return;
+    setSavingName(true);
+    try {
+      const { user: u } = await api.updateProfile({ name: name.trim() });
+      setUser?.(u);
+      setEditing(false);
+    } catch (err: any) {
+      alert(err?.message || "Не удалось сохранить имя");
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const requestNotif = async () => {
+    try {
+      const res = await Notification.requestPermission();
+      setNotifPerm(res);
+    } catch {}
+  };
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "profile", label: "Профиль" },
+    { id: "notifications", label: "Уведомления" },
+    { id: "interface", label: "Интерфейс" },
+  ];
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      {/* Banner */}
-      <div className="tf-profile-banner relative h-36 md:h-44 overflow-hidden border-b">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/40 via-primary/10 to-background" />
-        <div className="absolute inset-0 opacity-40 tf-glow-border" />
-        <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
-        <div className="absolute left-10 bottom-6 flex items-end gap-4">
-          <div className="h-20 w-20 rounded-2xl bg-card border-2 border-primary/40 flex items-center justify-center text-2xl font-bold shadow-lg">
-            {user?.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.avatarUrl}
-                alt=""
-                className="h-full w-full rounded-2xl object-cover"
-              />
-            ) : (
-              initials
-            )}
-          </div>
-          <div className="pb-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold">
-                {user?.name || "Пользователь"}
-              </h1>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
-                Pro
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">{user?.email}</p>
-            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-primary" />
-              Планируй задачи. Достигай целей. Живи продуктивно.
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="flex-1 flex flex-col min-h-0">
+      <header className="tf-view-header px-6 py-4 border-b">
+        <h1 className="text-xl font-semibold">Настройки</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Настрой под себя свой TaskFlow</p>
+      </header>
 
-      <div className="p-4 md:p-6 space-y-4 max-w-5xl">
-        {/* Birthday */}
-        <div className="rounded-xl border bg-card p-4 space-y-2">
-          <h2 className="text-sm font-semibold">Дата рождения</h2>
-          <p className="text-xs text-muted-foreground">
-            Никак не влияет на работу приложения — только чтобы красиво выделить
-            день в календаре.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="date"
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-              defaultValue={
-                user?.birthday ? String(user.birthday).slice(0, 10) : ""
-              }
-              onChange={async (e) => {
-                const v = e.target.value || null;
-                try {
-                  const { user: u } = await api.updateProfile({ birthday: v });
-                  setUser?.(u);
-                } catch (err: any) {
-                  alert(
-                    (err?.message || "Не удалось сохранить") +
-                      "\nЕсли колонки birthday ещё нет: в apps/api выполните npx prisma db push",
-                  );
-                }
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Stats row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Stat
-            icon={<ListTodo className="h-4 w-4 text-blue-500" />}
-            label="Всего задач"
-            value={total}
-            sub="Все время"
-          />
-          <Stat
-            icon={<CheckCircle2 className="h-4 w-4 text-emerald-500" />}
-            label="Выполнено"
-            value={completed}
-            sub={
-              total
-                ? `${Math.round((completed / total) * 100)}% завершено`
-                : "—"
-            }
-          />
-          <Stat
-            icon={<FolderKanban className="h-4 w-4 text-violet-500" />}
-            label="Проектов"
-            value={projects.length}
-            sub="Активных"
-          />
-          <Stat
-            icon={<Activity className="h-4 w-4 text-amber-500" />}
-            label="Продуктивность"
-            value={`${productivity}%`}
-            sub={
-              overdueTasks.length
-                ? `Просрочено: ${overdueTasks.length}`
-                : "Отличный результат"
-            }
-          />
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-4">
-          {/* Goals */}
-          <div className="rounded-2xl border bg-card p-4 tf-glow-border">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">Текущие цели</h2>
-            </div>
-            {activeGoals.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Пока нет активных целей
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {activeGoals.map((g) => {
-                  const targetValue = g.targetValue ?? 0;
-                  const currentValue = g.currentValue ?? 0;
-
-                  const pct =
-                    targetValue > 0
-                      ? Math.min(
-                          100,
-                          Math.round((currentValue / targetValue) * 100),
-                        )
-                      : 0;
-
-                  return (
-                    <div key={g.id}>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="font-medium truncate">{g.name}</span>
-                        <span className="text-muted-foreground tabular-nums">
-                          {g.currentValue}/{g.targetValue || "—"}
-                        </span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-primary transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Personalization */}
-          <div className="rounded-2xl border bg-card p-4 space-y-4">
-            <h2 className="text-sm font-semibold">Персонализация</h2>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm">Тема оформления</p>
-                <p className="text-xs text-muted-foreground">
-                  Цвета интерфейса
-                </p>
-              </div>
-              <ThemePicker />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm">Эффекты</p>
-                <p className="text-xs text-muted-foreground">
-                  Частицы и свечение
-                </p>
-              </div>
+      <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex flex-wrap gap-2 mb-4">
+            {tabs.map((t) => (
               <button
+                key={t.id}
                 type="button"
-                onClick={toggleEffects}
+                onClick={() => setTab(t.id)}
                 className={cn(
-                  "relative h-6 w-11 rounded-full transition-colors",
-                  effectsOn ? "bg-primary" : "bg-muted",
+                  "rounded-xl px-4 py-2 text-sm font-medium transition-all",
+                  tab === t.id ? "tf-btn-violet" : "border border-border/60 text-muted-foreground hover:bg-accent"
                 )}
               >
-                <span
-                  className={cn(
-                    "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                    effectsOn ? "left-5" : "left-0.5",
-                  )}
-                />
+                {t.label}
               </button>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
-              <Logo size={28} />
-              <span>TaskFlow · {stats?.totalMinutes ?? 0} мин фокуса</span>
-            </div>
+            ))}
           </div>
 
-          {/* Account */}
-          <div className="rounded-2xl border bg-card p-4 md:col-span-2">
-            <h2 className="text-sm font-semibold mb-3">Настройки аккаунта</h2>
-            <div className="grid sm:grid-cols-2 gap-3 text-sm">
-              <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Электронная почта
-                  </p>
-                  <p className="font-medium">{user?.email}</p>
+          {tab === "profile" && (
+            <div className="grid gap-4 lg:grid-cols-2 items-start">
+              <div className="tf-glass rounded-3xl p-5">
+                <div className="flex items-start gap-4">
+                  <div
+                    className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white"
+                    style={{
+                      background: "linear-gradient(135deg, hsl(var(--primary)), var(--tf-accent2))",
+                      boxShadow: "0 0 22px -4px var(--tf-glow)",
+                    }}
+                  >
+                    {initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {editing ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={saveName}
+                          disabled={savingName}
+                          className="rounded-md p-1.5 text-emerald-500 hover:bg-accent"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditing(false);
+                            setName(user?.name || "");
+                          }}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-accent"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-lg font-semibold truncate">{user?.name || "Пользователь"}</div>
+                    )}
+                    <div className="truncate text-xs text-muted-foreground">{user?.email}</div>
+                    {!editing && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(true)}
+                        className="mt-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
+                      >
+                        Изменить
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2.5">
+                  <div>
+                    <label className="text-[11px] text-muted-foreground">Дата рождения</label>
+                    <input
+                      type="date"
+                      className="mt-1 h-9 w-full rounded-md border border-input bg-background/60 px-2 text-sm"
+                      defaultValue={user?.birthday ? String(user.birthday).slice(0, 10) : ""}
+                      onChange={async (e) => {
+                        const v = e.target.value || null;
+                        try {
+                          const { user: u } = await api.updateProfile({ birthday: v });
+                          setUser?.(u);
+                        } catch (err: any) {
+                          alert(err?.message || "Не удалось сохранить");
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
-                <Shield className="h-4 w-4 text-muted-foreground" />
+
+              <div className="space-y-4">
+                <div className="tf-glass rounded-3xl p-5">
+                  <div className="text-sm font-semibold mb-3">Синхронизация</div>
+                  <div className="flex items-center gap-2 text-sm font-medium text-emerald-500">
+                    <RefreshCw className="h-4 w-4" />
+                    Включено
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Последняя синхронизация
+                    <br />
+                    <span className="font-medium text-foreground">
+                      {new Date().toLocaleString("ru-RU", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="tf-btn-hot flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Выйти из аккаунта
+                </button>
+              </div>
+            </div>
+          )}
+
+          {tab === "notifications" && (
+            <div className="tf-glass rounded-3xl p-5 max-w-xl">
+              <div className="flex items-center gap-3">
+                {notifPerm === "granted" ? (
+                  <Bell className="h-5 w-5 text-emerald-500" />
+                ) : (
+                  <BellOff className="h-5 w-5 text-muted-foreground" />
+                )}
                 <div>
-                  <p className="text-xs text-muted-foreground">Безопасность</p>
-                  <p className="font-medium">Пароль · OAuth</p>
+                  <div className="text-sm font-semibold">Уведомления браузера</div>
+                  <div className="text-xs text-muted-foreground">
+                    Статус:{" "}
+                    {notifPerm === "granted"
+                      ? "включены"
+                      : notifPerm === "denied"
+                      ? "заблокированы в браузере"
+                      : notifPerm === "unsupported"
+                      ? "не поддерживаются"
+                      : "не запрошены"}
+                  </div>
+                </div>
+                {notifPerm !== "granted" && notifPerm !== "unsupported" && (
+                  <button
+                    type="button"
+                    onClick={requestNotif}
+                    className="tf-btn-violet ml-auto rounded-xl px-3 py-2 text-xs font-semibold"
+                  >
+                    Включить
+                  </button>
+                )}
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                Напоминания о задачах и днях рождения приходят через браузер, даже если вкладка
+                свернута. Проверка — каждую минуту.
+              </p>
+            </div>
+          )}
+
+          {tab === "interface" && (
+            <div className="grid gap-4 lg:grid-cols-2 items-start">
+              <div className="tf-glass rounded-3xl p-5">
+                <div className="text-sm font-semibold mb-1">Тема оформления</div>
+                <p className="text-xs text-muted-foreground mb-3">Цвета и обои интерфейса</p>
+                <ThemePicker />
+              </div>
+              <div className="tf-glass rounded-3xl p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">Эффекты</div>
+                    <p className="text-xs text-muted-foreground">Частицы и свечение</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleEffects}
+                    className={cn(
+                      "relative h-6 w-11 rounded-full transition-colors",
+                      effectsOn ? "bg-primary" : "bg-muted"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                        effectsOn ? "left-5" : "left-0.5"
+                      )}
+                    />
+                  </button>
+                </div>
+                <div className="mt-3 text-xs text-muted-foreground">
+                  TaskFlow · {stats?.totalMinutes ?? 0} мин фокуса
                 </div>
               </div>
             </div>
+          )}
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            <Stat
+              icon={<ListTodo className="h-4 w-4 text-blue-500" />}
+              label="Всего задач"
+              value={total}
+              sub="Все время"
+            />
+            <Stat
+              icon={<CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+              label="Выполнено"
+              value={completed}
+              sub={total ? `${Math.round((completed / total) * 100)}% завершено` : "—"}
+            />
+            <Stat
+              icon={<FolderKanban className="h-4 w-4 text-violet-500" />}
+              label="Проектов"
+              value={projects.length}
+              sub="Активных"
+            />
+            <Stat
+              icon={<Activity className="h-4 w-4 text-amber-500" />}
+              label="Продуктивность"
+              value={`${productivity}%`}
+              sub={overdueTasks.length ? `Просрочено: ${overdueTasks.length}` : "Отличный результат"}
+            />
           </div>
         </div>
       </div>
@@ -288,7 +352,7 @@ function Stat({
   sub: string;
 }) {
   return (
-    <div className="rounded-2xl border bg-card p-3">
+    <div className="tf-glass rounded-2xl p-3">
       <div className="flex items-center gap-2 text-muted-foreground mb-1">
         {icon}
         <span className="text-xs">{label}</span>

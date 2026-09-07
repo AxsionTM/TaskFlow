@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn, formatDate, priorityLabels } from '@/lib/utils';
+import { TAG_COLORS, TAG_ICONS, randomTagColor, tagLabel } from '@/lib/tags';
 
 const PRIORITIES = [
   { value: 'NONE', label: 'Нет', color: 'bg-emerald-600' },
@@ -57,6 +58,8 @@ export function TaskDetail() {
   const [tags, setTags] = useState<any[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState('');
+  const [newTagIcon, setNewTagIcon] = useState('');
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[4]);
   const [showTagInput, setShowTagInput] = useState(false);
   const [saving, setSaving] = useState(false);
   const isSubtask = Boolean(task?.parentId);
@@ -231,11 +234,17 @@ const handleDueDateChange = (value: string) => {
 
   const handleCreateTag = async () => {
     if (!newTagName.trim()) return;
-    const { tag } = await api.createTag({ name: newTagName.trim() });
+    const { tag } = await api.createTag({
+      name: newTagName.trim(),
+      color: newTagColor || randomTagColor(),
+      icon: newTagIcon || null,
+    });
     setTags((prev) => [...prev, tag]);
     const next = [...selectedTagIds, tag.id];
     setSelectedTagIds(next);
     setNewTagName('');
+    setNewTagIcon('');
+    setNewTagColor(TAG_COLORS[4]);
     setShowTagInput(false);
     save({ tagIds: next });
   };
@@ -591,26 +600,69 @@ const handleDueDateChange = (value: string) => {
                         : 'border-border text-muted-foreground hover:border-primary/50'
                     )}
                   >
-                    {tag.name}
+                    {tagLabel(tag)}
                   </button>
                 );
               })}
               {showTagInput ? (
-                <div className="flex items-center gap-1">
-                  <Input
-                    value={newTagName}
-                    onChange={(e) => setNewTagName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCreateTag();
-                      if (e.key === 'Escape') setShowTagInput(false);
-                    }}
-                    placeholder="Новый тег"
-                    className="h-6 w-24 text-xs"
-                    autoFocus
-                  />
-                  <button onClick={handleCreateTag} className="text-xs text-primary">
-                    OK
-                  </button>
+                <div className="flex flex-col gap-1.5 rounded-lg border border-border/60 p-2">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setNewTagIcon(newTagIcon ? '' : TAG_ICONS[0])}
+                      title="Иконка тега"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-input text-sm"
+                    >
+                      {newTagIcon || '🙂'}
+                    </button>
+                    <Input
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCreateTag();
+                        if (e.key === 'Escape') setShowTagInput(false);
+                      }}
+                      placeholder="Новый тег"
+                      className="h-6 flex-1 text-xs"
+                      autoFocus
+                    />
+                    <button onClick={handleCreateTag} className="text-xs text-primary shrink-0">
+                      OK
+                    </button>
+                  </div>
+                  {newTagIcon && (
+                    <div className="grid grid-cols-12 gap-1">
+                      {TAG_ICONS.map((icon) => (
+                        <button
+                          key={icon}
+                          type="button"
+                          onClick={() => setNewTagIcon(icon)}
+                          className={cn(
+                            'flex h-6 items-center justify-center rounded border text-sm',
+                            newTagIcon === icon
+                              ? 'border-primary bg-primary/15'
+                              : 'border-border hover:border-primary/50'
+                          )}
+                        >
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-1">
+                    {TAG_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setNewTagColor(c)}
+                        className={cn(
+                          'h-4 w-4 rounded-full',
+                          newTagColor === c && 'ring-2 ring-offset-1 ring-primary'
+                        )}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <button

@@ -56,9 +56,21 @@ export function TodayDashboard() {
     fetchSessions();
   }, [fetchHabits, fetchGoals, fetchStats, fetchSessions]);
 
+  // Прогресс с учетом подзадач: задача с детьми дает долю за каждую
+  // выполненную подзадачу, задача без детей — 0/100% по статусу.
+  const taskScore = (t: any): number => {
+    const kids = (t.children || []).filter((c: any) => !c.isDeleted);
+    if (kids.length > 0) {
+      return kids.filter((c: any) => c.status === 'COMPLETED').length / kids.length;
+    }
+    return t.status === 'COMPLETED' ? 1 : 0;
+  };
   const done = todayTasks.filter((t) => t.status === 'COMPLETED').length;
   const total = todayTasks.length;
-  const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+  const progress =
+    total > 0
+      ? Math.round((todayTasks.reduce((s: number, t) => s + taskScore(t), 0) / total) * 100)
+      : 0;
   const ring = 2 * Math.PI * 52;
 
   const habitsDone = habits.filter((h) => h.completedToday).length;

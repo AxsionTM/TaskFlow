@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { useTasksStore } from '@/stores/tasks';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { plural } from '@/components/views/TomorrowView';
+import { tagLabel } from '@/lib/tags';
 
 interface DayGroup {
   key: string;
@@ -44,7 +45,7 @@ export function WeekView() {
     for (const t of tasks as any[]) {
       const tags = t.tags?.length ? t.tags : [{ tag: { name: t.project?.name || 'Без тега', color: t.project?.color || '#888888' } }];
       for (const tt of tags) {
-        const name = tt.tag?.name || 'Без тега';
+        const name = tagLabel(tt.tag) || 'Без тега';
         const color = tt.tag?.color || '#888888';
         if (!map.has(name)) map.set(name, { name, color, done: 0, total: 0 });
         const entry = map.get(name)!;
