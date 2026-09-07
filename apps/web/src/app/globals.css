@@ -763,7 +763,7 @@ body {
 
 /* ===== TaskFlow cosmic design system (desktop-first, mobile-safe) ===== */
 :root {
-  --tf-bg-image: none;
+  --tf-bg-image: url('/themes/light.png');
   --tf-veil: linear-gradient(180deg, rgba(248, 250, 252, 0.72), rgba(224, 242, 254, 0.55));
   --tf-bg-layers:
     radial-gradient(ellipse at 15% 10%, rgba(56, 189, 248, 0.16), transparent 50%),
@@ -772,7 +772,7 @@ body {
   --tf-accent2: #a855f7;
 }
 .dark {
-  --tf-bg-image: none;
+  --tf-bg-image: url('/themes/dark.png');
   --tf-veil: linear-gradient(180deg, rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.35));
   --tf-bg-layers:
     radial-gradient(ellipse at 80% 5%, rgba(99, 102, 241, 0.22), transparent 50%),
@@ -782,7 +782,7 @@ body {
   --tf-accent2: #c084fc;
 }
 html.theme-ocean {
-  --tf-bg-image: url('/themes/ocean.jpg');
+  --tf-bg-image: url('/themes/ocean.png');
   --tf-veil: linear-gradient(180deg, rgba(2, 6, 23, 0.5), rgba(2, 6, 23, 0.3));
   --tf-bg-layers:
     radial-gradient(ellipse at 50% -10%, rgba(165, 243, 252, 0.2), transparent 45%),
@@ -791,7 +791,7 @@ html.theme-ocean {
   --tf-accent2: #22d3ee;
 }
 html.theme-forest {
-  --tf-bg-image: url('/themes/forest.jpg');
+  --tf-bg-image: url('/themes/forest.png');
   --tf-veil: linear-gradient(180deg, rgba(5, 46, 22, 0.5), rgba(5, 46, 22, 0.3));
   --tf-bg-layers:
     radial-gradient(ellipse at 20% 0%, rgba(187, 247, 208, 0.14), transparent 45%),
@@ -800,7 +800,7 @@ html.theme-forest {
   --tf-accent2: #86efac;
 }
 html.theme-crimson {
-  --tf-bg-image: url('/themes/crimson.jpg');
+  --tf-bg-image: url('/themes/crimson.png');
   --tf-veil: linear-gradient(180deg, rgba(26, 5, 5, 0.5), rgba(26, 5, 5, 0.3));
   --tf-bg-layers:
     radial-gradient(circle at 50% 60%, rgba(239, 68, 68, 0.2), transparent 55%),
@@ -809,7 +809,7 @@ html.theme-crimson {
   --tf-accent2: #fca5a5;
 }
 html.theme-violet {
-  --tf-bg-image: url('/themes/violet.jpg');
+  --tf-bg-image: url('/themes/violet.png');
   --tf-veil: linear-gradient(180deg, rgba(12, 1, 24, 0.5), rgba(12, 1, 24, 0.28));
   --tf-bg-layers:
     radial-gradient(circle at 50% 45%, rgba(168, 85, 247, 0.22), transparent 50%),
@@ -818,7 +818,7 @@ html.theme-violet {
   --tf-accent2: #e9d5ff;
 }
 
-/* Живые обои темы под всем приложением. Если файла /themes/<id>.jpg нет —
+/* Живые обои темы под всем приложением. Если файла /themes/<id>.png нет —
    слой просто не рисуется, остаются градиенты. */
 body::before {
   content: '';

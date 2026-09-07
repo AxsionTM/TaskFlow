@@ -85,7 +85,15 @@ export function ThemePicker({ compact }: { compact?: boolean }) {
                   <div
                     className="tf-theme-card h-16 rounded-lg overflow-hidden mb-1.5"
                     style={{ backgroundImage: t.previewScene }}
-                  />
+                  >
+                    <img
+                      src={t.previewImage}
+                      alt={t.label}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                      onError={(e) => e.currentTarget.remove()}
+                    />
+                  </div>
                   <div className="flex items-center justify-between gap-1 px-0.5 pb-0.5">
                     <div>
                       <p className="text-[11px] font-semibold leading-tight">{t.label}</p>
@@ -105,17 +113,24 @@ export function ThemePicker({ compact }: { compact?: boolean }) {
               style={{ left: previewPos.x, top: previewPos.y }}
             >
               <div
-                className="w-60 h-36 rounded-2xl border-2 shadow-2xl overflow-hidden flex flex-col ring-2 ring-primary/40"
+                className="w-60 h-36 rounded-2xl border-2 shadow-2xl overflow-hidden flex flex-col ring-2 ring-primary/40 relative"
                 style={{
                   backgroundImage: hoverTheme.previewScene,
                   borderColor: hoverTheme.preview.primary,
                 }}
               >
-                <div className="px-3 pt-2.5 text-[11px] font-bold text-white drop-shadow">
+                <img
+                  src={hoverTheme.previewImage}
+                  alt={hoverTheme.label}
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => e.currentTarget.remove()}
+                />
+                <div className="relative px-3 pt-2.5 text-[11px] font-bold text-white drop-shadow">
                   TaskFlow · {hoverTheme.label}
                 </div>
-                <div className="px-3 text-[9px] text-white/70">{hoverTheme.description}</div>
-                <div className="m-2 mt-auto rounded-lg bg-black/45 backdrop-blur p-2 border border-white/15">
+                <div className="relative px-3 text-[9px] text-white/70">{hoverTheme.description}</div>
+                <div className="relative m-2 mt-auto rounded-lg bg-black/45 backdrop-blur p-2 border border-white/15">
                   <div
                     className="h-2 w-20 rounded-sm mb-1.5"
                     style={{ background: hoverTheme.preview.primary }}
