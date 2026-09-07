@@ -458,7 +458,7 @@ export function CreateTaskModal({ open, onClose }: Props) {
           <Button type="button" variant="ghost" size="sm" onClick={handleClose}>
             Отмена
           </Button>
-          <Button type="submit" size="sm" disabled={submitting || !title.trim()}>
+          <Button type="submit" size="sm" disabled={submitting || !title.trim()} className="tf-btn-violet">
             {submitting ? 'Создание...' : 'Создать'}
           </Button>
         </div>

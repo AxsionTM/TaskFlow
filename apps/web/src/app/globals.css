@@ -761,6 +761,206 @@ body {
   }
 }
 
+/* ===== TaskFlow cosmic design system (desktop-first, mobile-safe) ===== */
+:root {
+  --tf-bg-image: none;
+  --tf-veil: linear-gradient(180deg, rgba(248, 250, 252, 0.72), rgba(224, 242, 254, 0.55));
+  --tf-bg-layers:
+    radial-gradient(ellipse at 15% 10%, rgba(56, 189, 248, 0.16), transparent 50%),
+    radial-gradient(ellipse at 85% 90%, rgba(168, 85, 247, 0.12), transparent 50%);
+  --tf-glow: rgba(59, 130, 246, 0.35);
+  --tf-accent2: #a855f7;
+}
+.dark {
+  --tf-bg-image: none;
+  --tf-veil: linear-gradient(180deg, rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.35));
+  --tf-bg-layers:
+    radial-gradient(ellipse at 80% 5%, rgba(99, 102, 241, 0.22), transparent 50%),
+    radial-gradient(ellipse at 10% 95%, rgba(168, 85, 247, 0.14), transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.06), transparent 70%);
+  --tf-glow: rgba(99, 102, 241, 0.45);
+  --tf-accent2: #c084fc;
+}
+html.theme-ocean {
+  --tf-bg-image: url('/themes/ocean.jpg');
+  --tf-veil: linear-gradient(180deg, rgba(2, 6, 23, 0.5), rgba(2, 6, 23, 0.3));
+  --tf-bg-layers:
+    radial-gradient(ellipse at 50% -10%, rgba(165, 243, 252, 0.2), transparent 45%),
+    radial-gradient(ellipse at 85% 90%, rgba(14, 165, 233, 0.18), transparent 50%);
+  --tf-glow: rgba(56, 189, 248, 0.5);
+  --tf-accent2: #22d3ee;
+}
+html.theme-forest {
+  --tf-bg-image: url('/themes/forest.jpg');
+  --tf-veil: linear-gradient(180deg, rgba(5, 46, 22, 0.5), rgba(5, 46, 22, 0.3));
+  --tf-bg-layers:
+    radial-gradient(ellipse at 20% 0%, rgba(187, 247, 208, 0.14), transparent 45%),
+    radial-gradient(ellipse at 90% 95%, rgba(34, 197, 94, 0.16), transparent 50%);
+  --tf-glow: rgba(74, 222, 128, 0.45);
+  --tf-accent2: #86efac;
+}
+html.theme-crimson {
+  --tf-bg-image: url('/themes/crimson.jpg');
+  --tf-veil: linear-gradient(180deg, rgba(26, 5, 5, 0.5), rgba(26, 5, 5, 0.3));
+  --tf-bg-layers:
+    radial-gradient(circle at 50% 60%, rgba(239, 68, 68, 0.2), transparent 55%),
+    radial-gradient(ellipse at 50% 110%, rgba(127, 29, 29, 0.35), transparent 60%);
+  --tf-glow: rgba(248, 113, 113, 0.5);
+  --tf-accent2: #fca5a5;
+}
+html.theme-violet {
+  --tf-bg-image: url('/themes/violet.jpg');
+  --tf-veil: linear-gradient(180deg, rgba(12, 1, 24, 0.5), rgba(12, 1, 24, 0.28));
+  --tf-bg-layers:
+    radial-gradient(circle at 50% 45%, rgba(168, 85, 247, 0.22), transparent 50%),
+    radial-gradient(ellipse at 90% 95%, rgba(109, 40, 217, 0.25), transparent 55%);
+  --tf-glow: rgba(192, 132, 252, 0.55);
+  --tf-accent2: #e9d5ff;
+}
+
+/* Живые обои темы под всем приложением. Если файла /themes/<id>.jpg нет —
+   слой просто не рисуется, остаются градиенты. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--tf-bg-image), var(--tf-veil), var(--tf-bg-layers);
+  background-size: cover, cover, auto;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+/* Стеклянные панели поверх обоев — только десктоп, мобильную верстку не трогаем */
+@media (min-width: 1024px) {
+  .app-shell > .app-sidebar {
+    background-color: hsl(var(--card) / 0.68) !important;
+    backdrop-filter: blur(20px) saturate(1.25);
+    -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  }
+  .tf-task-header,
+  .tf-view-header,
+  .graph-toolbar {
+    background-color: hsl(var(--card) / 0.55);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .task-detail-panel {
+    background-color: hsl(var(--card) / 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
+/* Активный пункт меню — фиолетовый градиент как в дизайне */
+.tf-nav-active {
+  background: linear-gradient(92deg, hsl(var(--primary) / 0.95), hsl(var(--primary) / 0.5)) !important;
+  color: #fff !important;
+  font-weight: 600;
+  box-shadow:
+    0 6px 20px -6px var(--tf-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.tf-nav-active svg {
+  color: #fff !important;
+}
+
+/* Стеклянная карточка */
+.tf-glass {
+  background: hsl(var(--card) / 0.62);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid hsl(var(--primary) / 0.28);
+  box-shadow:
+    0 8px 32px -12px var(--tf-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Горячая кнопка Старт — розово-фиолетовый градиент */
+.tf-btn-hot {
+  background: linear-gradient(135deg, #ff2e63 0%, #f43f5e 45%, #c026d3 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow:
+    0 8px 26px -6px rgba(244, 63, 94, 0.65),
+    0 0 20px -4px rgba(192, 38, 211, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.tf-btn-hot:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow:
+    0 10px 32px -6px rgba(244, 63, 94, 0.8),
+    0 0 28px -2px rgba(192, 38, 211, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Фиолетовая кнопка Добавить */
+.tf-btn-violet {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow:
+    0 6px 22px -6px var(--tf-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.tf-btn-violet:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+/* Чипы пресетов фокуса */
+.tf-chip {
+  border: 1px solid hsl(var(--primary) / 0.3);
+  background: hsl(var(--card) / 0.6);
+  color: hsl(var(--muted-foreground));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.tf-chip-active {
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, hsl(var(--primary)), var(--tf-accent2)) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 18px -4px var(--tf-glow);
+}
+
+/* Цветной тег-пилюля с неоновым свечением */
+.tf-tag {
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.5;
+  padding: 1px 8px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Выбранная задача в списке */
+.tf-task-active {
+  background: linear-gradient(90deg, hsl(var(--primary) / 0.22), hsl(var(--primary) / 0.07)) !important;
+  box-shadow:
+    inset 2px 0 0 hsl(var(--primary)),
+    0 0 18px -6px var(--tf-glow);
+}
+
+/* Неоновые круги чекбоксов */
+.tf-check-glow[data-checked] {
+  box-shadow: 0 0 12px -1px var(--tf-glow);
+}
+
+/* Свечение кольца фокус-таймера */
+.tf-focus-ring {
+  filter:
+    drop-shadow(0 0 14px hsl(var(--primary) / 0.55))
+    drop-shadow(0 0 44px hsl(var(--primary) / 0.22));
+}
+
+/* Карточка темы с обоями */
+.tf-theme-card {
+  background-size: cover;
+  background-position: center;
+  border: 1px solid hsl(var(--primary) / 0.35);
+  box-shadow: 0 6px 22px -8px var(--tf-glow);
+}
+
 /* ===== Task list mobile layout fix ===== */
 .tf-task-list {
   width: 100%;

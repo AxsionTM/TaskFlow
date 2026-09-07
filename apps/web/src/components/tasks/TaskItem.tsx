@@ -45,7 +45,7 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
         onClick={() => setSelectedTask(task.id)}
         className={cn(
           'group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors',
-          isSelected ? 'bg-primary/10' : 'hover:bg-accent/60'
+          isSelected ? 'tf-task-active' : 'hover:bg-accent/60'
         )}
         style={{ paddingLeft: `${12 + depth * 16}px` }}
       >
@@ -55,7 +55,7 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
             completeTask(task.id);
           }}
         >
-          <Checkbox checked={task.status === 'COMPLETED'} priority={depth > 0 ? 'NONE' : task.priority} className={depth > 0 ? 'border-violet-400 data-[checked]:bg-violet-500' : undefined} />
+          <Checkbox checked={task.status === 'COMPLETED'} priority={depth > 0 ? 'NONE' : task.priority} className={cn('tf-check-glow', depth > 0 && 'border-violet-400 data-[checked]:bg-violet-500')} />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -86,18 +86,23 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
                 {isOverdue ? 'Просрочено' : isTimeLateToday ? `${contextualDateLabel} · время прошло` : contextualDateLabel}
               </span>
             )}
-            {task.tags?.map((tt: any) => (
-              <span
-                key={tt.tag?.id || tt.tagId}
-                className="text-[10px] px-1.5 py-0 rounded-full border"
-                style={{
-                  borderColor: (tt.tag?.color || '#888') + '80',
-                  color: tt.tag?.color || '#888',
-                }}
-              >
-                {tt.tag?.name}
-              </span>
-            ))}
+            {task.tags?.map((tt: any) => {
+              const color = tt.tag?.color || '#888888';
+              return (
+                <span
+                  key={tt.tag?.id || tt.tagId}
+                  className="tf-tag"
+                  style={{
+                    border: `1px solid ${color}99`,
+                    color,
+                    backgroundColor: `${color}1f`,
+                    boxShadow: `0 0 10px -3px ${color}88`,
+                  }}
+                >
+                  {tt.tag?.name}
+                </span>
+              );
+            })}
             {task.project && (
               <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                 <span

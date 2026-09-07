@@ -189,7 +189,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                   className={cn(
                     'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                     isActive
-                      ? 'bg-primary/10 text-primary font-medium'
+                      ? 'tf-nav-active'
                       : 'text-foreground hover:bg-accent'
                   )}
                 >
@@ -254,7 +254,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                       className={cn(
                         'group flex w-full items-center gap-1 rounded-md pr-1 transition-colors',
                         isActive
-                          ? 'bg-primary/10 text-primary font-medium'
+                          ? 'tf-nav-active'
                           : 'text-foreground hover:bg-accent'
                       )}
                     >
@@ -309,7 +309,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               className={cn(
                 'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                 currentView === 'habits'
-                  ? 'bg-primary/10 text-primary font-medium'
+                  ? 'tf-nav-active'
                   : 'text-foreground hover:bg-accent'
               )}
             >
@@ -321,7 +321,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               className={cn(
                 'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                 currentView === 'goals'
-                  ? 'bg-primary/10 text-primary font-medium'
+                  ? 'tf-nav-active'
                   : 'text-foreground hover:bg-accent'
               )}
             >
@@ -333,7 +333,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               className={cn(
                 'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                 currentView === 'focus'
-                  ? 'bg-primary/10 text-primary font-medium'
+                  ? 'tf-nav-active'
                   : 'text-foreground hover:bg-accent',
                 focusRunning && !focusPaused && 'ring-1 ring-emerald-500/50 bg-emerald-500/10'
               )}
@@ -365,7 +365,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               className={cn(
                 'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                 currentView === 'birthdays'
-                  ? 'bg-primary/10 text-primary font-medium'
+                  ? 'tf-nav-active'
                   : 'text-foreground hover:bg-accent'
               )}
             >
@@ -377,7 +377,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               className={cn(
                 'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                 currentView === 'graph'
-                  ? 'bg-primary/10 text-primary font-medium'
+                  ? 'tf-nav-active'
                   : 'text-foreground hover:bg-accent'
               )}
             >
@@ -389,7 +389,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               className={cn(
                 'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                 currentView === 'pulse'
-                  ? 'bg-primary/10 text-primary font-medium'
+                  ? 'tf-nav-active'
                   : 'text-foreground hover:bg-accent'
               )}
             >
@@ -401,7 +401,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               className={cn(
                 'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                 currentView === 'trash'
-                  ? 'bg-primary/10 text-primary font-medium'
+                  ? 'tf-nav-active'
                   : 'text-foreground hover:bg-accent'
               )}
             >
