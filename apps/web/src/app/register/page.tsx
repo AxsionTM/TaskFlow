@@ -14,16 +14,21 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (password !== confirmPassword) {
+      setError('Пароли не совпадают');
+      return;
+    }
     setIsLoading(true);
     try {
-      await register(email, password, name || undefined);
-      router.push('/app');
+      const { email: registeredEmail } = await register(email, password, name || undefined);
+      router.push(`/verify?email=${encodeURIComponent(registeredEmail)}`);
     } catch (err: any) {
       setError(err.message || 'Ошибка регистрации');
     } finally {
@@ -90,6 +95,11 @@ export default function RegisterPage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-300">Пароль</label>
                 <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Минимум 6 символов" required minLength={6} autoComplete="new-password" className="h-11 bg-white/[0.03] border-white/10" />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">Повторите пароль</label>
+                <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Повторите пароль" required minLength={6} autoComplete="new-password" className="h-11 bg-white/[0.03] border-white/10" />
               </div>
 
               <Button type="submit" className="h-11 w-full rounded-xl font-semibold" disabled={isLoading}>

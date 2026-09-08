@@ -359,6 +359,17 @@ body {
 }
 
 @media (max-width: 767px) {
+  /* Mobile perf: фон не fixed (дорого на телефонах), меньше blur, тише тени. */
+  body::before {
+    background-attachment: scroll;
+  }
+  .tf-glass {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .tf-focus-ring {
+    filter: none;
+  }
   /* Never let desktop-only hover effects make touch devices feel heavy. */
   html.effects-on .tf-glow-border::before {
     animation-duration: 8s;
@@ -419,6 +430,14 @@ body {
     .app-sidebar > :last-child {
       padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
     }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tf-star,
+  .tf-spark,
+  .tf-glow-border::before {
+    animation: none !important;
   }
 }
 
@@ -808,6 +827,54 @@ html.theme-crimson {
   --tf-glow: rgba(248, 113, 113, 0.5);
   --tf-accent2: #fca5a5;
 }
+html.theme-black {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 96%;
+  --card: 0 0% 4%;
+  --card-foreground: 0 0% 96%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 9%;
+  --secondary-foreground: 0 0% 96%;
+  --muted: 0 0% 7%;
+  --muted-foreground: 0 0% 60%;
+  --accent: 0 0% 10%;
+  --accent-foreground: 0 0% 96%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 13%;
+  --input: 0 0% 13%;
+  --ring: 217 91% 60%;
+  --heatmap-empty: #171717;
+  --heatmap-empty-border: #262626;
+  /* Без фоновой картинки: чистый чёрный + лёгкие статичные градиенты */
+  --tf-bg-image: none;
+  --tf-veil: linear-gradient(180deg, rgba(0, 0, 0, 0.0), rgba(0, 0, 0, 0.0));
+  --tf-bg-layers:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.045), transparent 55%),
+    radial-gradient(ellipse at 50% 110%, rgba(59, 130, 246, 0.07), transparent 55%);
+  --tf-glow: rgba(148, 163, 184, 0.35);
+  --tf-accent2: #93c5fd;
+  color-scheme: dark;
+}
+html.theme-black body {
+  background-color: #000;
+}
+html.theme-black body::before {
+  background-image: var(--tf-bg-layers);
+  background-size: auto;
+}
+/* В чёрной теме — минимум blur и лёгкие тени ради производительности */
+html.theme-black .tf-glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: hsl(var(--card) / 0.95);
+  box-shadow: 0 4px 16px -12px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+html.theme-black .tf-focus-ring {
+  filter: none;
+}
+
 html.theme-violet {
   --tf-bg-image: url('/themes/violet.png');
   --tf-veil: linear-gradient(180deg, rgba(12, 1, 24, 0.5), rgba(12, 1, 24, 0.28));

@@ -9,7 +9,7 @@ import { Palette, Check } from 'lucide-react';
 function applyThemeClass(theme: string) {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
-  const themed = ['ocean', 'forest', 'crimson', 'violet'];
+  const themed = ['ocean', 'forest', 'crimson', 'violet', 'black'];
   themed.forEach((t) => root.classList.remove(`theme-${t}`));
   if (themed.includes(theme)) {
     root.classList.add(`theme-${theme}`);
@@ -86,13 +86,15 @@ export function ThemePicker({ compact }: { compact?: boolean }) {
                     className="tf-theme-card h-16 rounded-lg overflow-hidden mb-1.5"
                     style={{ backgroundImage: t.previewScene }}
                   >
-                    <img
-                      src={t.previewImage}
-                      alt={t.label}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                      onError={(e) => e.currentTarget.remove()}
-                    />
+                    {t.previewImage ? (
+                      <img
+                        src={t.previewImage}
+                        alt={t.label}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                        onError={(e) => e.currentTarget.remove()}
+                      />
+                    ) : null}
                   </div>
                   <div className="flex items-center justify-between gap-1 px-0.5 pb-0.5">
                     <div>
@@ -119,13 +121,15 @@ export function ThemePicker({ compact }: { compact?: boolean }) {
                   borderColor: hoverTheme.preview.primary,
                 }}
               >
-                <img
-                  src={hoverTheme.previewImage}
-                  alt={hoverTheme.label}
-                  loading="lazy"
-                  className="absolute inset-0 h-full w-full object-cover"
-                  onError={(e) => e.currentTarget.remove()}
-                />
+                {hoverTheme.previewImage ? (
+                  <img
+                    src={hoverTheme.previewImage}
+                    alt={hoverTheme.label}
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover"
+                    onError={(e) => e.currentTarget.remove()}
+                  />
+                ) : null}
                 <div className="relative px-3 pt-2.5 text-[11px] font-bold text-white drop-shadow">
                   TaskFlow · {hoverTheme.label}
                 </div>

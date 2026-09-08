@@ -18,7 +18,14 @@ export function EffectsLayer() {
   useEffect(() => {
     initEffectsFromStorage();
     setMounted(true);
-    const dots = Array.from({ length: STAR_COUNT }, (_, i) => ({
+    // Mobile: вдвое меньше частиц — главный источник лагов на телефонах.
+    const isMobile =
+      typeof window !== 'undefined' &&
+      (window.matchMedia('(max-width: 767px)').matches ||
+        window.matchMedia('(pointer: coarse)').matches);
+    const dotsCount = isMobile ? Math.ceil(STAR_COUNT / 2) : STAR_COUNT;
+    const sparksCount = isMobile ? 0 : SPARK_COUNT;
+    const dots = Array.from({ length: dotsCount }, (_, i) => ({
       id: i,
       left: Math.random() * 100,
       top: Math.random() * 100,
@@ -27,7 +34,7 @@ export function EffectsLayer() {
       dur: 5 + Math.random() * 9,
       kind: 'dot' as const,
     }));
-    const sparks = Array.from({ length: SPARK_COUNT }, (_, i) => ({
+    const sparks = Array.from({ length: sparksCount }, (_, i) => ({
       id: 100 + i,
       left: Math.random() * 100,
       top: Math.random() * 100,
@@ -51,6 +58,18 @@ export function EffectsLayer() {
   if (!mounted || !enabled) return null;
 
   const t = theme || resolvedTheme || 'dark';
+
+  // Classic Black: без анимированных частиц — только статичная виньетка.
+  if (t === 'black') {
+    return (
+      <div className="pointer-events-none fixed inset-0 z-[5] overflow-hidden" aria-hidden>
+        <div
+          className="absolute inset-0 opacity-40"
+          style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.05) 0%, transparent 55%)' }}
+        />
+      </div>
+    );
+  }
   const glowColor =
     t === 'ocean'
       ? 'rgba(56,189,248,0.75)'

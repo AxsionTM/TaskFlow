@@ -1,10 +1,12 @@
 export class ApiError extends Error {
   status: number;
+  code?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -49,16 +51,57 @@ class ApiClient {
     if (!res.ok) {
       const error = await res.json().catch(() => ({ error: { message: `Ошибка ${res.status}` } }));
       const msg = error.error?.message || error.message || `Ошибка ${res.status}`;
-      throw new ApiError(msg, res.status);
+      const code = error.error?.code || error.code;
+      throw new ApiError(msg, res.status, code);
     }
     return res.json();
   }
 
-  register(data: { email: string; password: string; name?: string }) {
-    return this.request<{ user: any; token: string; inboxId: string }>('/auth/register', {
+  register(data: { email: string; password: string; confirmPassword: string; name?: string }) {
+    return this.request<{
+      requiresVerification: boolean;
+      email: string;
+      emailSent: boolean;
+      devCode?: string;
+    }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  verifyEmail(data: { email: string; code: string }) {
+    return this.request<{ user: any; token: string; inboxId: string }>('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  resendCode(data: { email: string; purpose?: 'verify' | 'reset' }) {
+    return this.request<{ ok: boolean; message: string; emailSent?: boolean; devCode?: string }>(
+      '/auth/resend-code',
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+  }
+
+  forgotPassword(data: { email: string }) {
+    return this.request<{ ok: boolean; message: string; devCode?: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  verifyResetCode(data: { email: string; code: string }) {
+    return this.request<{ ok: boolean; resetToken: string }>('/auth/verify-reset-code', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  resetPassword(data: { resetToken: string; password: string; confirmPassword: string }) {
+    return this.request<{ ok: boolean; message: string; user: any; token: string }>(
+      '/auth/reset-password',
+      { method: 'POST', body: JSON.stringify(data) }
+    );
   }
 
   login(data: { email: string; password: string }) {

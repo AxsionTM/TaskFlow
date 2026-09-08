@@ -135,7 +135,9 @@ export function ObsidianGraph({ nodes, edges, onOpenTask, hideTimeline, colorMod
     const canvas = canvasRef.current, wrap = wrapRef.current;
     if (!canvas || !wrap) return;
     const rect = wrap.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Mobile: DPR 1.5 достаточно для чёткости и заметно дешевле для батареи/GPU.
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const dpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
     dprRef.current = dpr;
     canvas.width = Math.max(1, Math.floor(rect.width * dpr));
     canvas.height = Math.max(1, Math.floor(rect.height * dpr));

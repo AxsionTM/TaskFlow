@@ -2,10 +2,13 @@ import 'dotenv/config';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { prisma } from '../../common/utils/prisma';
 import { AppError } from '../../common/middleware/error-handler';
 import { authMiddleware, AuthRequest } from '../../common/middleware/auth';
+import { sendVerificationCode } from '../../common/utils/mailer';
+import { issueCode, consumeCode, invalidateCodes } from '../../common/utils/verification';
 
 const router = Router();
 
@@ -15,7 +18,17 @@ const API_URL = process.env.API_URL || 'http://localhost:3001';
 const registerSchema = z.object({
   email: z.string().email('Некорректный email'),
   password: z.string().min(6, 'Пароль должен быть не менее 6 символов'),
+  confirmPassword: z.string().min(1, 'Повторите пароль'),
   name: z.string().min(1).optional(),
+});
+
+// Строгий лимит для кодовых эндпоинтов: защита от перебора и спама письмами.
+const codeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: 'Слишком много запросов. Попробуйте позже.', code: 'RATE_LIMITED' } },
 });
 
 const loginSchema = z.object({
@@ -92,9 +105,13 @@ async function findOrCreateOAuthUser(params: {
         email: params.email.toLowerCase(),
         name: params.name || params.email.split('@')[0],
         avatarUrl: params.avatarUrl,
+        emailVerified: true, // email уже подтверждён провайдером (Google/GitHub)
       },
     });
     await ensureInbox(user.id);
+  } else if (!user.emailVerified) {
+    await prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+    user = { ...user, emailVerified: true };
   }
 
   await prisma.account.create({
@@ -121,6 +138,10 @@ router.post('/register', async (req, res, next) => {
   try {
     const data = registerSchema.parse(req.body);
 
+    if (data.password !== data.confirmPassword) {
+      throw new AppError(400, 'Пароли не совпадают');
+    }
+
     const existing = await prisma.user.findUnique({
       where: { email: data.email.toLowerCase() },
     });
@@ -136,22 +157,237 @@ router.post('/register', async (req, res, next) => {
         email: data.email.toLowerCase(),
         passwordHash,
         name: data.name || data.email.split('@')[0],
+        emailVerified: false,
       },
+    });
+
+    await ensureInbox(user.id);
+
+    // Код подтверждения: пользователь активируется только после verify-email.
+    // Токен сессии НЕ выдаём до подтверждения почты.
+    const code = await issueCode(user.email, 'VERIFY_EMAIL');
+    const mail = await sendVerificationCode({ to: user.email, code, kind: 'verify' });
+
+    res.status(201).json({
+      requiresVerification: true,
+      email: user.email,
+      emailSent: mail.sent,
+      ...(mail.devCode ? { devCode: mail.devCode } : {}),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Email verification ---
+
+router.post('/verify-email', codeLimiter, async (req, res, next) => {
+  try {
+    const data = z
+      .object({
+        email: z.string().email('Некорректный email'),
+        code: z.string().min(1, 'Введите код'),
+      })
+      .parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: { email: data.email.toLowerCase() },
+    });
+    if (!user) {
+      throw new AppError(400, 'Неверный код. Проверьте и попробуйте снова.', 'INVALID_CODE');
+    }
+
+    await consumeCode(user.email, 'VERIFY_EMAIL', data.code);
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true },
     });
 
     const inboxId = await ensureInbox(user.id);
     const token = generateToken(user.id);
 
-    res.status(201).json({
+    res.json({
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        theme: user.theme,
-        locale: user.locale,
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        theme: updated.theme,
+        locale: updated.locale,
+        emailVerified: true,
       },
       token,
       inboxId,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/resend-code', codeLimiter, async (req, res, next) => {
+  try {
+    const data = z
+      .object({
+        email: z.string().email('Некорректный email'),
+        purpose: z.enum(['verify', 'reset']).optional().default('verify'),
+      })
+      .parse(req.body);
+
+    const email = data.email.toLowerCase();
+    const target: 'VERIFY_EMAIL' | 'RESET_PASSWORD' =
+      data.purpose === 'reset' ? 'RESET_PASSWORD' : 'VERIFY_EMAIL';
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    // Не раскрываем существование аккаунта для reset; для verify тоже отвечаем
+    // нейтрально, если пользователя нет.
+    if (!user) {
+      return res.json({ ok: true, message: 'Если аккаунт с таким email существует, мы отправили код.' });
+    }
+
+    if (target === 'VERIFY_EMAIL' && user.emailVerified) {
+      return res.json({ ok: true, message: 'Почта уже подтверждена. Войдите в аккаунт.' });
+    }
+
+    const code = await issueCode(email, target);
+    const mail = await sendVerificationCode({
+      to: email,
+      code,
+      kind: target === 'VERIFY_EMAIL' ? 'verify' : 'reset',
+    });
+
+    res.json({
+      ok: true,
+      emailSent: mail.sent,
+      message: mail.sent
+        ? 'Мы отправили код на вашу почту.'
+        : 'Почтовый сервер не настроен. Используйте код из ответа (dev-режим).',
+      ...(mail.devCode ? { devCode: mail.devCode } : {}),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Password recovery ---
+
+const GENERIC_FORGOT_MESSAGE = 'Если аккаунт с таким email существует, мы отправили код.';
+
+router.post('/forgot-password', codeLimiter, async (req, res, next) => {
+  try {
+    const data = z.object({ email: z.string().email('Некорректный email') }).parse(req.body);
+    const email = data.email.toLowerCase();
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    let devCode: string | undefined;
+    if (user) {
+      try {
+        const code = await issueCode(email, 'RESET_PASSWORD');
+        const mail = await sendVerificationCode({ to: email, code, kind: 'reset' });
+        devCode = mail.devCode;
+      } catch (err) {
+        // Cooldown/rate-limit: не раскрываем детали сверх необходимого.
+        if (err instanceof AppError && (err.statusCode === 429)) throw err;
+      }
+    }
+
+    res.json({
+      ok: true,
+      message: GENERIC_FORGOT_MESSAGE,
+      ...(devCode ? { devCode } : {}),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+function generateResetToken(userId: string, version: number): string {
+  return jwt.sign(
+    { userId, purpose: 'password-reset', v: version },
+    process.env.JWT_SECRET || 'fallback-secret',
+    { expiresIn: '15m' }
+  );
+}
+
+router.post('/verify-reset-code', codeLimiter, async (req, res, next) => {
+  try {
+    const data = z
+      .object({
+        email: z.string().email('Некорректный email'),
+        code: z.string().min(1, 'Введите код'),
+      })
+      .parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: { email: data.email.toLowerCase() },
+    });
+    if (!user) {
+      throw new AppError(400, 'Неверный код. Проверьте и попробуйте снова.', 'INVALID_CODE');
+    }
+
+    await consumeCode(user.email, 'RESET_PASSWORD', data.code);
+    const resetToken = generateResetToken(user.id, user.updatedAt.getTime());
+
+    res.json({ ok: true, resetToken });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/reset-password', codeLimiter, async (req, res, next) => {
+  try {
+    const data = z
+      .object({
+        resetToken: z.string().min(1, 'Отсутствует токен восстановления'),
+        password: z.string().min(6, 'Пароль должен быть не менее 6 символов'),
+        confirmPassword: z.string().min(1, 'Повторите пароль'),
+      })
+      .parse(req.body);
+
+    if (data.password !== data.confirmPassword) {
+      throw new AppError(400, 'Пароли не совпадают');
+    }
+
+    let payload: { userId: string; purpose?: string; v?: number };
+    try {
+      payload = jwt.verify(
+        data.resetToken,
+        process.env.JWT_SECRET || 'fallback-secret'
+      ) as { userId: string; purpose?: string; v?: number };
+    } catch {
+      throw new AppError(400, 'Ссылка восстановления недействительна или истекла. Запросите новый код.', 'RESET_EXPIRED');
+    }
+
+    if (payload.purpose !== 'password-reset' || typeof payload.v !== 'number') {
+      throw new AppError(400, 'Недействительный токен восстановления.', 'RESET_INVALID');
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!user || user.updatedAt.getTime() !== payload.v) {
+      throw new AppError(400, 'Токен восстановления уже использован или устарел. Запросите новый код.', 'RESET_EXPIRED');
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 12);
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      // Смена пароля доказывает владение почтой → подтверждаем её заодно.
+      data: { passwordHash, emailVerified: true },
+    });
+    await invalidateCodes(updated.email, 'RESET_PASSWORD');
+
+    const token = generateToken(user.id);
+    res.json({
+      ok: true,
+      message: 'Пароль успешно изменён.',
+      user: {
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        theme: updated.theme,
+        locale: updated.locale,
+        emailVerified: true,
+      },
+      token,
     });
   } catch (err) {
     next(err);
@@ -176,6 +412,10 @@ router.post('/login', async (req, res, next) => {
       throw new AppError(401, 'Неверный email или пароль');
     }
 
+    if (!user.emailVerified) {
+      throw new AppError(403, 'Почта не подтверждена. Введите код из письма.', 'EMAIL_NOT_VERIFIED');
+    }
+
     const token = generateToken(user.id);
 
     res.json({
@@ -186,6 +426,7 @@ router.post('/login', async (req, res, next) => {
         theme: user.theme,
         locale: user.locale,
         avatarUrl: user.avatarUrl,
+        emailVerified: user.emailVerified,
       },
       token,
     });
@@ -206,6 +447,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res, next) => {
         theme: true,
         locale: true,
         birthday: true,
+        emailVerified: true,
         createdAt: true,
       },
     });
@@ -249,6 +491,7 @@ router.patch('/me', authMiddleware, async (req: AuthRequest, res, next) => {
         theme: true,
         locale: true,
         birthday: true,
+        emailVerified: true,
         createdAt: true,
       },
     });

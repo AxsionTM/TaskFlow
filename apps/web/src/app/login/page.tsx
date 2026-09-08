@@ -30,6 +30,10 @@ function LoginContent() {
       await login(email, password);
       router.push('/app');
     } catch (err: any) {
+      if (err?.code === 'EMAIL_NOT_VERIFIED' || err?.status === 403) {
+        router.push(`/verify?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+        return;
+      }
       setError(err.message || 'Ошибка входа');
     } finally {
       setIsLoading(false);
@@ -83,7 +87,12 @@ function LoginContent() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Пароль</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-slate-300">Пароль</label>
+                  <Link href="/forgot" className="text-xs text-primary transition hover:text-primary/80">
+                    Забыли пароль?
+                  </Link>
+                </div>
                 <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Введите пароль" required autoComplete="current-password" className="h-11 bg-white/[0.03] border-white/10" />
               </div>
 

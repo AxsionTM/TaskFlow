@@ -9,6 +9,7 @@ interface User {
   theme?: string;
   locale?: string;
   birthday?: string | null;
+  emailVerified?: boolean;
 }
 
 interface AuthState {
@@ -16,8 +17,16 @@ interface AuthState {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** email ожидает подтверждения после register/login */
+  pendingVerificationEmail: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name?: string) => Promise<void>;
+  register: (email: string, password: string, name?: string) => Promise<{ email: string; devCode?: string }>;
+  verifyEmail: (email: string, code: string) => Promise<void>;
+  resendCode: (email: string, purpose?: 'verify' | 'reset') => Promise<{ message: string; devCode?: string }>;
+  forgotPassword: (email: string) => Promise<{ message: string; devCode?: string }>;
+  verifyResetCode: (email: string, code: string) => Promise<string>;
+  resetPassword: (resetToken: string, password: string) => Promise<void>;
+  clearPendingVerification: () => void;
   logout: () => void;
   checkAuth: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -28,22 +37,64 @@ export const useAuthStore = create<AuthState>((set) => ({
   token: null,
   isLoading: true,
   isAuthenticated: false,
+  pendingVerificationEmail: null,
 
   login: async (email, password) => {
-    const { user, token } = await api.login({ email, password });
-    api.setToken(token);
-    set({ user, token, isAuthenticated: true, isLoading: false });
+    try {
+      const { user, token } = await api.login({ email, password });
+      api.setToken(token);
+      set({ user, token, isAuthenticated: true, isLoading: false, pendingVerificationEmail: null });
+    } catch (err) {
+      // Почта не подтверждена → ведём на страницу ввода кода, сессию не создаём.
+      if (
+        err instanceof ApiError &&
+        (err.status === 403 || (err as any)?.code === 'EMAIL_NOT_VERIFIED')
+      ) {
+        set({ pendingVerificationEmail: email.trim().toLowerCase() });
+      }
+      throw err;
+    }
   },
 
   register: async (email, password, name) => {
-    const { user, token } = await api.register({ email, password, name });
-    api.setToken(token);
-    set({ user, token, isAuthenticated: true, isLoading: false });
+    const res = await api.register({ email, password, confirmPassword: password, name });
+    // Токен до подтверждения не выдаётся — только pending email.
+    set({ pendingVerificationEmail: res.email });
+    return { email: res.email, devCode: res.devCode };
   },
+
+  verifyEmail: async (email, code) => {
+    const { user, token } = await api.verifyEmail({ email, code });
+    api.setToken(token);
+    set({ user, token, isAuthenticated: true, isLoading: false, pendingVerificationEmail: null });
+  },
+
+  resendCode: async (email, purpose) => {
+    const res = await api.resendCode({ email, purpose });
+    return { message: res.message, devCode: res.devCode };
+  },
+
+  forgotPassword: async (email) => {
+    const res = await api.forgotPassword({ email });
+    return { message: res.message, devCode: res.devCode };
+  },
+
+  verifyResetCode: async (email, code) => {
+    const res = await api.verifyResetCode({ email, code });
+    return res.resetToken;
+  },
+
+  resetPassword: async (resetToken, password) => {
+    const res = await api.resetPassword({ resetToken, password, confirmPassword: password });
+    api.setToken(res.token);
+    set({ user: res.user, token: res.token, isAuthenticated: true, isLoading: false });
+  },
+
+  clearPendingVerification: () => set({ pendingVerificationEmail: null }),
 
   logout: () => {
     api.setToken(null);
-    set({ user: null, token: null, isAuthenticated: false });
+    set({ user: null, token: null, isAuthenticated: false, pendingVerificationEmail: null });
   },
 
   setUser: (user) => set({ user }),

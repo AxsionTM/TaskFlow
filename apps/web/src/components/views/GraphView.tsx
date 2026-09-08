@@ -14,6 +14,69 @@ const PRIORITY_DOT: Record<string, string> = {
   NONE: '#22a06b',
 };
 
+const PRIORITY_ORDER = ['HIGH', 'MEDIUM', 'LOW', 'NONE'] as const;
+const PRIORITY_LABEL: Record<string, string> = {
+  HIGH: 'Высокий',
+  MEDIUM: 'Средний',
+  LOW: 'Низкий',
+  NONE: 'Без приоритета',
+};
+
+/** Кольцевая диаграмма приоритетов — сегменты из реальных долей задач. */
+function PriorityDonut({ byPriority, total }: { byPriority: Record<string, number>; total: number }) {
+  const R = 40;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+  const segments = PRIORITY_ORDER.map((p) => {
+    const value = byPriority[p] || 0;
+    const frac = total > 0 ? value / total : 0;
+    const seg = { key: p, value, frac, offset: acc };
+    acc += frac;
+    return seg;
+  });
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative h-24 w-24 shrink-0">
+        <svg className="tf-focus-ring h-full w-full -rotate-90" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r={R} fill="none" stroke="hsl(var(--muted) / 0.35)" strokeWidth="9" />
+          {segments.map(
+            (s) =>
+              s.frac > 0 && (
+                <circle
+                  key={s.key}
+                  cx="50" cy="50" r={R} fill="none"
+                  stroke={PRIORITY_DOT[s.key]} strokeWidth="9"
+                  strokeLinecap="butt"
+                  strokeDasharray={`${s.frac * C} ${C}`}
+                  strokeDashoffset={-s.offset * C}
+                />
+              )
+          )}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-xl font-bold tabular-nums">{total}</span>
+          <span className="px-1 text-center text-[8px] leading-tight text-muted-foreground">задач</span>
+        </div>
+      </div>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        {segments.map((s) => (
+          <div key={s.key} className="flex items-center gap-1.5 text-[11px]">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: PRIORITY_DOT[s.key], boxShadow: `0 0 6px ${PRIORITY_DOT[s.key]}` }}
+            />
+            <span className="flex-1 truncate text-muted-foreground">{PRIORITY_LABEL[s.key]}</span>
+            <span className="tabular-nums font-semibold">{s.value}</span>
+            <span className="w-9 shrink-0 text-right tabular-nums text-muted-foreground">
+              {total > 0 ? `${Math.round(s.frac * 100)}%` : '—'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function GraphView() {
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
@@ -37,26 +100,61 @@ export function GraphView() {
     return () => { active = false; };
   }, [days]);
 
-  const stats = useMemo(() => {
-    const tasks = nodes.filter((n) => n.type === 'task');
-    const active = tasks.filter((n) => n.status !== 'COMPLETED');
-    const dayCount = nodes.filter((n) => n.type === 'date').length;
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
+
+  const taskNodes = useMemo(() => nodes.filter((n) => n.type === 'task'), [nodes]);
+  const dayCount = useMemo(() => nodes.filter((n) => n.type === 'date').length, [nodes]);
+
+  /** Задачи выбранного дня (корни + подзадачи, у которых есть dateKeys дня). */
+  const dayTasks = useMemo(() => {
+    if (!selectedDay) return null;
+    const key = selectedDay.dateKey;
+    return taskNodes.filter(
+      (n) => n.dateKey === key || (Array.isArray(n.dateKeys) && n.dateKeys.includes(key))
+    );
+  }, [taskNodes, selectedDay]);
+
+  /** Статистика по набору задач: всё из реальных узлов, без хардкода. */
+  const scopedStats = useMemo(() => {
+    const list = dayTasks ?? taskNodes;
+    const byPriority: Record<string, number> = { HIGH: 0, MEDIUM: 0, LOW: 0, NONE: 0 };
+    let completed = 0;
+    let overdue = 0;
+    for (const t of list) {
+      const p = t.priority && t.priority in byPriority ? t.priority : 'NONE';
+      byPriority[p] += 1;
+      if (t.status === 'COMPLETED') {
+        completed += 1;
+      } else if (t.dueDate && new Date(t.dueDate).getTime() < todayStart) {
+        overdue += 1;
+      }
+    }
+    const total = list.length;
+    return {
+      total,
+      completed,
+      overdue,
+      active: total - completed,
+      byPriority,
+      scope: dayTasks ? 'day' : 'all',
+    };
+  }, [dayTasks, taskNodes, todayStart]);
+
+  const projectGroups = useMemo(() => {
+    const list = (dayTasks ?? taskNodes).filter((n) => n.status !== 'COMPLETED');
     const map = new Map<string, { name: string; color: string; count: number }>();
-    for (const t of active) {
-      const hasProject = Boolean(t.projectName);
+    for (const t of list) {
       const name = t.projectName || 'Без проекта';
       const color = t.projectColor || 'hsl(var(--primary))';
       if (!map.has(name)) map.set(name, { name, color, count: 0 });
       map.get(name)!.count += 1;
-      void hasProject;
     }
-    return {
-      active: active.length,
-      total: tasks.length,
-      dayCount,
-      groups: Array.from(map.values()).sort((a, b) => b.count - a.count),
-    };
-  }, [nodes]);
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [dayTasks, taskNodes]);
 
   if (loading) return <div className="flex flex-1 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
   if (error) return <div className="flex flex-1 items-center justify-center"><div className="rounded-lg border bg-card px-5 py-4 text-sm text-destructive">{error}</div></div>;
@@ -82,8 +180,6 @@ export function GraphView() {
     else { alert(`Импортировано задач: ${data.imported}`); window.location.reload(); }
     event.target.value = '';
   };
-
-  const ring = 2 * Math.PI * 40;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -152,43 +248,58 @@ export function GraphView() {
 
         <div className="flex min-w-0 flex-col gap-4">
         <div className="tf-glass h-fit min-w-0 rounded-3xl p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-sm font-semibold">Статистика</span>
-            <span className="text-[11px] tabular-nums text-muted-foreground">{stats.dayCount} дн. · {stats.total} узлов</span>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="text-sm font-semibold">
+              {selectedDay ? `Выбранный день · ${selectedDay.label}` : 'Статистика'}
+            </span>
+            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+              {selectedDay ? `${scopedStats.total} задач дня` : `${dayCount} дн. · ${scopedStats.total} узлов`}
+            </span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="relative h-24 w-24 shrink-0">
-              <svg className="tf-focus-ring h-full w-full -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--muted) / 0.4)" strokeWidth="9" />
-                <circle
-                  cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--primary))" strokeWidth="9"
-                  strokeLinecap="round" strokeDasharray={ring}
-                  strokeDashoffset={stats.active > 0 ? 0 : ring}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xl font-bold tabular-nums">{stats.active}</span>
-                <span className="px-1 text-center text-[8px] leading-tight text-muted-foreground">активных задач</span>
+          {scopedStats.total === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 px-3 py-8 text-center">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+                <CalendarDays className="h-5 w-5" />
+              </span>
+              <p className="mt-2 text-sm font-semibold">Нет задач</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {selectedDay ? 'В этот день задач нет' : 'За период задач нет'}
+              </p>
+            </div>
+          ) : (
+            <>
+              <PriorityDonut
+                byPriority={scopedStats.byPriority}
+                total={scopedStats.total}
+              />
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-xl border border-border/50 bg-card/40 px-1 py-2">
+                  <div className="text-base font-bold tabular-nums text-emerald-500">{scopedStats.active}</div>
+                  <div className="text-[9px] text-muted-foreground">активных</div>
+                </div>
+                <div className="rounded-xl border border-border/50 bg-card/40 px-1 py-2">
+                  <div className="text-base font-bold tabular-nums text-sky-500">{scopedStats.completed}</div>
+                  <div className="text-[9px] text-muted-foreground">выполнено</div>
+                </div>
+                <div className="rounded-xl border border-border/50 bg-card/40 px-1 py-2">
+                  <div className="text-base font-bold tabular-nums text-red-500">{scopedStats.overdue}</div>
+                  <div className="text-[9px] text-muted-foreground">просрочено</div>
+                </div>
               </div>
-            </div>
-            <div className="min-w-0 text-xs text-muted-foreground leading-relaxed">
-              {stats.active === 0
-                ? 'Нет активных задач за период'
-                : `${stats.active} ${stats.active === 1 ? 'задача' : stats.active < 5 ? 'задачи' : 'задач'} в работе`}
-            </div>
-          </div>
+            </>
+          )}
           <div className="mt-3 space-y-2">
-            {stats.groups.map((g) => (
+            {projectGroups.map((g) => (
               <div key={g.name} className="flex items-center gap-2 text-sm">
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: g.color, boxShadow: `0 0 8px -1px ${g.color}` }}
                 />
-                <span className="flex-1 truncate">{g.name === 'Без проекта' && stats.groups.length === 1 && stats.active === 0 ? 'Нет проектов' : g.name}</span>
+                <span className="flex-1 truncate">{g.name === 'Без проекта' && projectGroups.length === 1 && scopedStats.active === 0 ? 'Нет проектов' : g.name}</span>
                 <span className="tabular-nums text-muted-foreground">{g.count}</span>
               </div>
             ))}
-            {stats.groups.length === 0 && (
+            {projectGroups.length === 0 && scopedStats.total > 0 && (
               <p className="text-xs text-muted-foreground">Нет проектов — создайте первый проект</p>
             )}
           </div>

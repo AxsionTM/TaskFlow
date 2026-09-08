@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} themes={["light", "dark", "ocean", "forest", "crimson", "violet"]}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} themes={["light", "dark", "ocean", "forest", "crimson", "violet", "black"]}>
           <ServiceWorkerRegister />
           {children}
         </ThemeProvider>

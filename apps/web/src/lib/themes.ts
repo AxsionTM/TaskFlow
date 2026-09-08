@@ -4,7 +4,8 @@ export type AppThemeId =
   | 'ocean'
   | 'forest'
   | 'crimson'
-  | 'violet';
+  | 'violet'
+  | 'black';
 
 export interface AppTheme {
   id: AppThemeId;
@@ -86,4 +87,14 @@ export const APP_THEMES: AppTheme[] = [
     { bg: '#0c0118', sidebar: '#1a0a2e', primary: '#c084fc', accent: '#a855f7' },
     'radial-gradient(circle at 50% 50%, #e9d5ff 0%, #a855f7 20%, transparent 48%), radial-gradient(ellipse at 85% 90%, #6d28d9 0%, transparent 50%), linear-gradient(180deg, #0c0118 0%, #1e1040 60%, #0c0118 100%)'
   ),
+  {
+    id: 'black',
+    label: 'Classic Black',
+    description: 'Чистый чёрный',
+    preview: { bg: '#000000', sidebar: '#0a0a0a', primary: '#e5e5e5', accent: '#3b82f6' },
+    previewScene: 'linear-gradient(180deg, #050505 0%, #000000 60%, #0a0a0a 100%)',
+    // Без фоновой картинки: чистый чёрный фон, лёгкие CSS-градиенты выше.
+    bgImage: '',
+    previewImage: '',
+  },
 ];
