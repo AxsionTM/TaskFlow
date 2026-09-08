@@ -26,6 +26,14 @@ dotenv.config();
 const app = express();
 
 /**
+ * Vercel работает как reverse proxy и ставит X-Forwarded-For.
+ * Без trust proxy express-rate-limit не может определить реальный IP
+ * и отвечает 429 (ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) на каждый запрос.
+ * Один хоп — Vercel proxy. Устанавливается ДО любых rate limiter middleware.
+ */
+app.set('trust proxy', 1);
+
+/**
  * CORS
  *
  * Основной production frontend:
