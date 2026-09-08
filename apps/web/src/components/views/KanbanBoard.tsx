@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -22,7 +22,7 @@ import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatDate, cn } from '@/lib/utils';
 import { TagPill } from '@/components/tasks/TagPill';
-import { Calendar, Plus, GripVertical, ChevronRight, Flame, Loader, CheckCircle2 } from 'lucide-react';
+import { Calendar, Plus, GripVertical, ChevronRight, ChevronLeft, Flame, Loader, CheckCircle2 } from 'lucide-react';
 
 const COLUMNS = [
   { id: 'TODO', title: 'К выполнению', icon: Flame, tint: '#f43f5e' },
@@ -38,10 +38,22 @@ const PRIORITY_DOT: Record<string, string> = {
 };
 
 function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
-  const { setSelectedTask, completeTask, selectedTaskId } = useTasksStore();
+  const { setSelectedTask, completeTask, selectedTaskId, updateTask } = useTasksStore();
   const isSelected = selectedTaskId === task.id;
   const dot = PRIORITY_DOT[task.priority] || PRIORITY_DOT.NONE;
   const done = task.status === 'COMPLETED';
+
+  // Touch-friendly «Переместить» для телефона: шаг статуса влево/вправо.
+  const statusOrder = COLUMNS.map((c) => c.id);
+  const currentIdx = Math.max(
+    0,
+    statusOrder.indexOf(task.status === 'CANCELLED' ? 'TODO' : task.status)
+  );
+  const moveTask = (dir: -1 | 1) => {
+    const next = statusOrder[currentIdx + dir];
+    if (!next || next === task.status) return;
+    void updateTask(task.id, { status: next });
+  };
 
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: task.id,
@@ -90,7 +102,27 @@ function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
             <p className={cn('flex-1 text-[13px] font-medium leading-snug', done && 'line-through text-muted-foreground')}>
               {task.title}
             </p>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+            <span className="flex shrink-0 items-center gap-0.5 lg:hidden">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); moveTask(-1); }}
+                disabled={currentIdx <= 0}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 text-muted-foreground disabled:opacity-30"
+                aria-label="Переместить назад"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); moveTask(1); }}
+                disabled={currentIdx >= statusOrder.length - 1}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 text-muted-foreground disabled:opacity-30"
+                aria-label="Переместить вперёд"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </span>
+            <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground lg:block" />
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {task.dueDate && (
@@ -207,6 +239,59 @@ function Column({
   );
 }
 
+/** Мобильный индикатор колонки «1 / 3» + точки — только телефон. */
+function KanbanMobileIndicator({ targetId, total }: { targetId: string; total: number }) {
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    const onScroll = () => {
+      const cards = Array.from(el.querySelectorAll(':scope > div > div'));
+      if (!cards.length) return;
+      let best = 0;
+      let bestDist = Infinity;
+      const viewLeft = el.scrollLeft + el.clientWidth / 2;
+      cards.forEach((card, i) => {
+        const c = card as HTMLElement;
+        const center = c.offsetLeft + c.offsetWidth / 2;
+        const dist = Math.abs(center - viewLeft);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = i;
+        }
+      });
+      setActive(Math.min(best, total - 1));
+    };
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [targetId, total]);
+
+  return (
+    <div className="flex shrink-0 items-center justify-center gap-2 px-3 pt-2 lg:hidden" aria-hidden>
+      <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">
+        {active + 1} / {total}
+      </span>
+      <span className="flex items-center gap-1">
+        {Array.from({ length: total }, (_, i) => (
+          <span
+            key={i}
+            className={cn(
+              'h-1.5 rounded-full transition-all',
+              i === active ? 'w-5 bg-primary' : 'w-1.5 bg-muted-foreground/30'
+            )}
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
+
 export function KanbanBoard() {
   const {
     tasks,
@@ -296,7 +381,8 @@ export function KanbanBoard() {
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
     >
-      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4">
+      <KanbanMobileIndicator targetId="tf-kanban-scroll" total={columns.length} />
+      <div id="tf-kanban-scroll" className="tf-kanban-scroll flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4">
         <div className="flex gap-3 h-full min-w-max items-stretch pb-1">
           {columns.map((col) => (
             <Column

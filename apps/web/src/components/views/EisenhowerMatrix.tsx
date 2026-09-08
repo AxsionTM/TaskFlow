@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatDate, cn } from '@/lib/utils';
@@ -226,16 +226,47 @@ export function EisenhowerMatrix() {
     return map;
   }, [allTasks]);
 
+  // Телефон: один квадрант за раз с переключателем (все 4 остаются доступны).
+  const [mobileQuad, setMobileQuad] = useState<Quadrant>('do');
+
   return (
     <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-4">
       <div className="grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1fr)_280px] items-start">
+        {/* Мобильный переключатель квадрантов */}
+        <div className="grid grid-cols-2 gap-2 lg:hidden" role="tablist" aria-label="Квадранты матрицы">
+          {QUADRANTS.map((q) => (
+            <button
+              key={q.id}
+              role="tab"
+              aria-selected={mobileQuad === q.id}
+              type="button"
+              onClick={() => setMobileQuad(q.id)}
+              className={cn(
+                'flex min-h-[44px] items-center justify-center gap-1.5 rounded-2xl border px-2 py-2 text-[11px] font-semibold transition-all',
+                mobileQuad === q.id ? 'text-white' : 'text-muted-foreground'
+              )}
+              style={
+                mobileQuad === q.id
+                  ? { borderColor: `${q.color}88`, background: `${q.color}26`, color: q.color, boxShadow: `0 0 16px -6px ${q.color}` }
+                  : { borderColor: 'hsl(var(--border) / .6)', background: 'hsl(var(--card) / .5)' }
+              }
+            >
+              <span className="truncate">{q.title}</span>
+              <span className="tabular-nums">· {grouped[q.id].length}</span>
+            </button>
+          ))}
+        </div>
         <div className="grid min-w-0 grid-cols-1 md:grid-cols-2 gap-3">
           {QUADRANTS.map((q) => {
             const Icon = q.icon;
             return (
               <div
                 key={q.id}
-                className="flex min-h-[280px] flex-col rounded-3xl border tf-glass overflow-hidden"
+                className={cn(
+                  'min-h-[280px] flex-col rounded-3xl border tf-glass overflow-hidden',
+                  mobileQuad === q.id ? 'flex' : 'hidden',
+                  'lg:flex'
+                )}
                 style={{
                   borderColor: `${q.color}45`,
                   boxShadow: `0 0 28px -12px ${q.color}88, inset 0 1px 0 rgba(255,255,255,.05)`,

@@ -30,8 +30,15 @@ export function GlobalQuickAdd() {
       }
     };
 
+    // Мобильная кнопка «+» в нижней навигации.
+    const onQuickAdd = () => setOpen(true);
+
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('tf:quick-add', onQuickAdd);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('tf:quick-add', onQuickAdd);
+    };
   }, []);
 
   return <CreateTaskModal open={open} onClose={() => setOpen(false)} />;
