@@ -1,11 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Download, Loader2, Network, Upload, Share2, Flag, Layers } from 'lucide-react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { Download, Loader2, Network, Upload, Share2, Flag, Layers, CalendarDays, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTasksStore } from '@/stores/tasks';
-import { GraphNode, GraphEdge, ObsidianGraph } from './ObsidianGraph';
+import { GraphNode, GraphEdge, ObsidianGraph, type SelectedDayInfo } from './ObsidianGraph';
 import { cn } from '@/lib/utils';
+
+const PRIORITY_DOT: Record<string, string> = {
+  HIGH: '#ef4444',
+  MEDIUM: '#f59e0b',
+  LOW: '#3b82f6',
+  NONE: '#22a06b',
+};
 
 export function GraphView() {
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -15,7 +22,9 @@ export function GraphView() {
   const [days, setDays] = useState('7');
   const [hideTimeline, setHideTimeline] = useState(false);
   const [colorMode, setColorMode] = useState<'priority' | 'cluster'>('priority');
+  const [selectedDay, setSelectedDay] = useState<SelectedDayInfo | null>(null);
   const setSelectedTask = useTasksStore((state) => state.setSelectedTask);
+  const onSelectedDay = useCallback((info: SelectedDayInfo | null) => setSelectedDay(info), []);
 
   useEffect(() => {
     let active = true;
@@ -29,15 +38,24 @@ export function GraphView() {
   }, [days]);
 
   const stats = useMemo(() => {
-    const active = nodes.filter((n) => n.type === 'task' && n.status !== 'COMPLETED');
+    const tasks = nodes.filter((n) => n.type === 'task');
+    const active = tasks.filter((n) => n.status !== 'COMPLETED');
+    const dayCount = nodes.filter((n) => n.type === 'date').length;
     const map = new Map<string, { name: string; color: string; count: number }>();
     for (const t of active) {
+      const hasProject = Boolean(t.projectName);
       const name = t.projectName || 'Без проекта';
-      const color = t.projectColor || '#888888';
+      const color = t.projectColor || 'hsl(var(--primary))';
       if (!map.has(name)) map.set(name, { name, color, count: 0 });
       map.get(name)!.count += 1;
+      void hasProject;
     }
-    return { active: active.length, groups: Array.from(map.values()).sort((a, b) => b.count - a.count) };
+    return {
+      active: active.length,
+      total: tasks.length,
+      dayCount,
+      groups: Array.from(map.values()).sort((a, b) => b.count - a.count),
+    };
   }, [nodes]);
 
   if (loading) return <div className="flex flex-1 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
@@ -103,6 +121,8 @@ export function GraphView() {
               onOpenTask={setSelectedTask}
               hideTimeline={hideTimeline}
               colorMode={colorMode}
+              onSelectedDay={onSelectedDay}
+              embeddedPanel
             />
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t border-border/50 px-4 py-3">
@@ -130,9 +150,11 @@ export function GraphView() {
           </div>
         </div>
 
+        <div className="flex min-w-0 flex-col gap-4">
         <div className="tf-glass h-fit min-w-0 rounded-3xl p-4">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold">Статистика</span>
+            <span className="text-[11px] tabular-nums text-muted-foreground">{stats.dayCount} дн. · {stats.total} узлов</span>
           </div>
           <div className="flex items-center gap-3">
             <div className="relative h-24 w-24 shrink-0">
@@ -149,6 +171,11 @@ export function GraphView() {
                 <span className="px-1 text-center text-[8px] leading-tight text-muted-foreground">активных задач</span>
               </div>
             </div>
+            <div className="min-w-0 text-xs text-muted-foreground leading-relaxed">
+              {stats.active === 0
+                ? 'Нет активных задач за период'
+                : `${stats.active} ${stats.active === 1 ? 'задача' : stats.active < 5 ? 'задачи' : 'задач'} в работе`}
+            </div>
           </div>
           <div className="mt-3 space-y-2">
             {stats.groups.map((g) => (
@@ -157,14 +184,60 @@ export function GraphView() {
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: g.color, boxShadow: `0 0 8px -1px ${g.color}` }}
                 />
-                <span className="flex-1 truncate">{g.name}</span>
+                <span className="flex-1 truncate">{g.name === 'Без проекта' && stats.groups.length === 1 && stats.active === 0 ? 'Нет проектов' : g.name}</span>
                 <span className="tabular-nums text-muted-foreground">{g.count}</span>
               </div>
             ))}
             {stats.groups.length === 0 && (
-              <p className="text-xs text-muted-foreground">Нет активных задач</p>
+              <p className="text-xs text-muted-foreground">Нет проектов — создайте первый проект</p>
             )}
           </div>
+        </div>
+
+        {/* Выбранный день — под статистикой справа, а не поверх графа */}
+        <div className="tf-glass h-fit min-w-0 rounded-3xl p-4">
+          <div className="flex items-start gap-2.5">
+            {selectedDay ? (
+              <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full" style={{ background: selectedDay.color, boxShadow: `0 0 14px ${selectedDay.color}66` }} />
+            ) : (
+              <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] uppercase tracking-[.18em] text-muted-foreground">Выбранный день</div>
+              <div className="mt-0.5 truncate text-base font-semibold">{selectedDay ? selectedDay.label : 'День не выбран'}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {selectedDay
+                  ? selectedDay.roots.length
+                    ? `${selectedDay.roots.length} задач · ${selectedDay.descendantCount} подзадач раскрыто · ${selectedDay.roots.length + selectedDay.descendantCount} узлов`
+                    : 'На этот день открытых задач нет · 0 узлов'
+                  : 'Нажмите на узел дня в графе'}
+              </div>
+            </div>
+            {selectedDay && (
+              <button onClick={() => setSelectedDay(null)} className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground" title="Снять выбор">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {selectedDay && (
+            <div className="mt-3 max-h-72 space-y-1.5 overflow-y-auto">
+              {selectedDay.roots.length === 0 && (
+                <p className="rounded-xl border border-dashed border-border/60 px-3 py-4 text-center text-xs text-muted-foreground">Задач нет</p>
+              )}
+              {selectedDay.roots.map((task) => (
+                <button
+                  key={task.id}
+                  onClick={() => task.taskId && setSelectedTask(task.taskId)}
+                  className="flex w-full items-center gap-2 rounded-xl border border-border/50 bg-card/40 px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent/60"
+                >
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PRIORITY_DOT[task.priority || 'NONE'], boxShadow: `0 0 8px -1px ${PRIORITY_DOT[task.priority || 'NONE']}` }} />
+                  <span className="min-w-0 flex-1 truncate">{task.label}</span>
+                  <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">+</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         </div>
       </div>
     </div>

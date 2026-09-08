@@ -18,10 +18,10 @@ import {
   Bell,
   BellOff,
   LogOut,
-  Pencil,
   Check,
   X,
   RefreshCw,
+  Download,
 } from "lucide-react";
 
 type Tab = "profile" | "notifications" | "interface";
@@ -90,6 +90,29 @@ export function ProfileView() {
       const res = await Notification.requestPermission();
       setNotifPerm(res);
     } catch {}
+  };
+
+  const handleExport = async (format: 'json' | 'csv') => {
+    try {
+      const token = api.getToken();
+      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/export/${format}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        alert('Ошибка экспорта');
+        return;
+      }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download =
+        format === 'json'
+          ? `taskflow-export-${new Date().toISOString().slice(0, 10)}.json`
+          : `taskflow-tasks-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      alert('Ошибка экспорта');
+    }
   };
 
   const tabs: { id: Tab; label: string }[] = [
@@ -303,6 +326,28 @@ export function ProfileView() {
                 </div>
                 <div className="mt-3 text-xs text-muted-foreground">
                   TaskFlow · {stats?.totalMinutes ?? 0} мин фокуса
+                </div>
+              </div>
+              <div className="tf-glass rounded-3xl p-5 lg:col-span-2">
+                <div className="text-sm font-semibold mb-1">Экспорт данных</div>
+                <p className="text-xs text-muted-foreground mb-3">Скачайте все задачи в удобном формате</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleExport('json')}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/20"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Экспорт JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleExport('csv')}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/20"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Экспорт CSV
+                  </button>
                 </div>
               </div>
             </div>

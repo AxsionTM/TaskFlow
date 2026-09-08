@@ -60,7 +60,7 @@ export function ReminderWorker() {
         const key = `bday-me-${now.toISOString().slice(0, 10)}`;
         if (!firedRef.current.has(key)) {
           showNotification('С днём рождения!', {
-            body: 'Пусть день будет продуктивным и приятным 🎂',
+            body: 'Пусть день будет продуктивным и приятным!',
             tag: key,
           });
           firedRef.current.add(key);

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useBirthdaysStore, ageFromDate } from '@/stores/birthdays';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Cake, Plus, Trash2 } from 'lucide-react';
+import { Cake, Plus, Trash2, Gift, PartyPopper } from 'lucide-react';
 
 export function BirthdaysView() {
   const { items, loading, fetch, create, remove } = useBirthdaysStore();
@@ -58,9 +58,10 @@ export function BirthdaysView() {
           type="button"
           onClick={() => setShowForm((v) => !v)}
           title="Добавить день рождения"
-          className="tf-btn-violet flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-bold leading-none"
+          className="tf-btn-violet flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
         >
-          +
+          <Plus className="h-4 w-4" />
+          Добавить день рождения
         </button>
       </div>
 
@@ -131,8 +132,8 @@ export function BirthdaysView() {
                   {b.note ? ` · ${b.note}` : ''}
                 </p>
               </div>
-              <span className="text-lg shrink-0" role="img" aria-label="Подарок">
-                🎁
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-pink-400/40 bg-pink-500/10 text-pink-400">
+                <Gift className="h-4 w-4" />
               </span>
               <button
                 type="button"
@@ -152,8 +153,8 @@ export function BirthdaysView() {
       </div>
 
       <div className="tf-glass rounded-2xl p-4 mt-4 flex items-center gap-3">
-        <span className="text-3xl shrink-0" role="img" aria-label="Подарок">
-          🎁
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-pink-400/40 bg-pink-500/10 text-pink-400">
+          <PartyPopper className="h-5 w-5" />
         </span>
         <div>
           <p className="text-sm font-semibold">Добавьте дни рождения</p>

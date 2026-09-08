@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, AlarmClock, Inbox, Cake, Flame, ChevronRight as Arrow } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlarmClock, Inbox, Cake, Flame, Gift, ChevronRight as Arrow } from 'lucide-react';
 import { useTasksStore } from '@/stores/tasks';
 import { useBirthdaysStore, ageFromDate } from '@/stores/birthdays';
 import { useHabitsStore } from '@/stores/habits';
@@ -239,7 +239,7 @@ export function UpcomingBirthdays({ limit = 3 }: { limit?: number }) {
   return (
     <div className="tf-glass rounded-3xl p-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-semibold">🎁 Следующие дни рождения</span>
+        <span className="flex items-center gap-1.5 text-sm font-semibold"><Gift className="h-4 w-4 text-pink-400" />Следующие дни рождения</span>
         <button
           type="button"
           onClick={() => setCurrentView('birthdays')}

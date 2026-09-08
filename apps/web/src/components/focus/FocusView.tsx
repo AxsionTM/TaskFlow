@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useFocusStore } from '@/stores/focus';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Play, Pause, RotateCcw, Timer } from 'lucide-react';
+import { Play, Pause, RotateCcw, Timer, CheckCircle2, VolumeX, Sprout } from 'lucide-react';
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -31,6 +31,7 @@ export function FocusView() {
     breakMinutes,
     remainingSeconds,
     completedPomodoros,
+    sessionFinished,
     stats,
     sessions,
     setWorkMinutes,
@@ -39,7 +40,9 @@ export function FocusView() {
     pause,
     resume,
     reset,
-    tick,
+    startNext,
+    dismissFinished,
+    stopSound,
     fetchStats,
     fetchSessions,
   } = useFocusStore();
@@ -105,9 +108,11 @@ export function FocusView() {
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl leading-none" role="img" aria-label="Помидор">
-                🍅
-              </span>
+              {sessionFinished ? (
+                <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+              ) : (
+                <Timer className={cn('h-9 w-9', mode === 'work' ? 'text-primary' : 'text-green-500')} />
+              )}
               <span className="text-5xl font-semibold tracking-tight tabular-nums mt-2">
                 {formatTime(remainingSeconds)}
               </span>
@@ -128,12 +133,39 @@ export function FocusView() {
             </div>
           </div>
 
+          {/* Сессия завершена */}
+          {sessionFinished && (
+            <div className="mt-6 w-full rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-center">
+              <p className="text-sm font-semibold text-emerald-500">Сессия завершена — отличная работа!</p>
+              <p className="mt-1 text-xs text-muted-foreground">+{Math.max(1, Math.round(workMinutes))} мин к общему времени · {completedPomodoros} сессий сегодня</p>
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                <Button size="sm" onClick={startNext} className="tf-btn-hot gap-1.5 rounded-xl">
+                  <Play className="h-4 w-4" />
+                  Новая сессия
+                </Button>
+                <Button size="sm" variant="outline" onClick={reset} className="gap-1.5 rounded-xl">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Сбросить
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { stopSound(); dismissFinished(); }} className="gap-1.5 rounded-xl">
+                  <VolumeX className="h-3.5 w-3.5" />
+                  Остановить звук
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Controls */}
           <div className="flex items-center gap-3 mt-8">
-            {!isRunning ? (
+            {!isRunning && !sessionFinished ? (
               <Button size="lg" onClick={start} className="tf-btn-hot gap-2 px-8 rounded-xl">
                 <Play className="h-5 w-5" />
                 Старт
+              </Button>
+            ) : sessionFinished ? (
+              <Button size="lg" onClick={startNext} className="tf-btn-hot gap-2 px-8 rounded-xl">
+                <Play className="h-5 w-5" />
+                Продолжить
               </Button>
             ) : isPaused ? (
               <Button size="lg" onClick={resume} className="tf-btn-hot gap-2 px-8 rounded-xl">
@@ -211,7 +243,7 @@ export function FocusView() {
                       className="flex items-center gap-3 text-sm px-3 py-2 rounded-xl border border-border/50 bg-card/40"
                     >
                       <span
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
                         style={{
                           color: dot,
                           border: `1.5px solid ${dot}`,
@@ -219,7 +251,7 @@ export function FocusView() {
                           background: `${dot}14`,
                         }}
                       >
-                        🍅
+                        <Timer className="h-4 w-4" />
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate font-medium">
@@ -242,13 +274,13 @@ export function FocusView() {
               </div>
             ) : (
               <p className="text-xs text-muted-foreground px-1 py-2">
-                Пока нет сессий — запустите первый помидор 🍅
+                Пока нет сессий — запустите первый помидор
               </p>
             )}
           </div>
           <div className="tf-glass rounded-3xl p-4 flex items-center gap-3">
-            <span className="text-3xl shrink-0" role="img" aria-label="Росток">
-              🌱
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500">
+              <Sprout className="h-5 w-5" />
             </span>
             <p className="text-sm font-medium leading-snug">
               Маленькие шаги создают большие результаты!

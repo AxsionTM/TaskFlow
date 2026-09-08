@@ -22,17 +22,26 @@ import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatDate, cn } from '@/lib/utils';
 import { TagPill } from '@/components/tasks/TagPill';
-import { Calendar, Plus, GripVertical } from 'lucide-react';
+import { Calendar, Plus, GripVertical, ChevronRight, Flame, Loader, CheckCircle2 } from 'lucide-react';
 
 const COLUMNS = [
-  { id: 'TODO', title: 'К выполнению', color: 'border-t-violet-500', tint: '#a855f7' },
-  { id: 'IN_PROGRESS', title: 'В работе', color: 'border-t-blue-500', tint: '#3b82f6' },
-  { id: 'COMPLETED', title: 'Выполнено', color: 'border-t-green-500', tint: '#22c55e' },
+  { id: 'TODO', title: 'К выполнению', icon: Flame, tint: '#f43f5e' },
+  { id: 'IN_PROGRESS', title: 'В работе', icon: Loader, tint: '#3b82f6' },
+  { id: 'COMPLETED', title: 'Готово', icon: CheckCircle2, tint: '#22c55e' },
 ];
+
+const PRIORITY_DOT: Record<string, string> = {
+  HIGH: '#ef4444',
+  MEDIUM: '#f59e0b',
+  LOW: '#3b82f6',
+  NONE: '#22a06b',
+};
 
 function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
   const { setSelectedTask, completeTask, selectedTaskId } = useTasksStore();
   const isSelected = selectedTaskId === task.id;
+  const dot = PRIORITY_DOT[task.priority] || PRIORITY_DOT.NONE;
+  const done = task.status === 'COMPLETED';
 
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: task.id,
@@ -48,19 +57,21 @@ function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{ ...style, borderColor: `${dot}44`, boxShadow: `0 0 18px -10px ${dot}88` }}
       onClick={() => setSelectedTask(task.id)}
       className={cn(
-        'rounded-xl tf-glass p-3 cursor-pointer shadow-sm hover:shadow transition-shadow',
-        isSelected && 'ring-2 ring-primary/40'
+        'group rounded-2xl border bg-card/50 p-3 cursor-pointer backdrop-blur transition-all',
+        'hover:brightness-125 hover:-translate-y-[1px]',
+        isSelected && 'ring-2 ring-primary/50'
       )}
     >
       <div className="flex items-start gap-2">
         <button
-          className="mt-0.5 p-0.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+          className="mt-0.5 p-0.5 text-muted-foreground/60 hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
           {...attributes}
           {...listeners}
           onClick={(e) => e.stopPropagation()}
+          title="Перетащить"
         >
           <GripVertical className="h-4 w-4" />
         </button>
@@ -71,47 +82,50 @@ function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
             completeTask(task.id);
           }}
         >
-          <Checkbox checked={task.status === 'COMPLETED'} priority={task.priority} ghost size="sm" className="tf-check-glow" />
+          <Checkbox checked={done} priority={task.priority} ghost size="sm" className="tf-check-glow" />
         </div>
         <div className="flex-1 min-w-0">
-          <p
-            className={cn(
-              'text-sm font-medium leading-snug',
-              task.status === 'COMPLETED' && 'line-through text-muted-foreground'
-            )}
-          >
-            {task.title}
-          </p>
-          {task.dueDate && (
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 text-xs mt-1.5',
-                new Date(task.dueDate) < new Date(new Date().setHours(0, 0, 0, 0)) &&
-                  task.status !== 'COMPLETED'
-                  ? 'text-red-500'
-                  : 'text-muted-foreground'
-              )}
-            >
-              <Calendar className="h-3 w-3" />
-              {formatDate(task.dueDate)}
-            </span>
-          )}
-          {task.tags?.[0] && (
-            <span className="mt-1.5 inline-block">
-              <TagPill tag={task.tags[0].tag} />
-            </span>
-          )}
-          {task.project && (
-            <div className="flex items-center gap-1 mt-1.5">
+          <div className="flex items-start gap-1.5">
+            <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: dot, boxShadow: `0 0 8px -1px ${dot}` }} />
+            <p className={cn('flex-1 text-[13px] font-medium leading-snug', done && 'line-through text-muted-foreground')}>
+              {task.title}
+            </p>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {task.dueDate && (
               <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: task.project.color, boxShadow: `0 0 8px -1px ${task.project.color}` }}
-              />
-              <span className="text-xs text-muted-foreground truncate">
-                {task.project.name}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] tabular-nums',
+                  new Date(task.dueDate) < new Date(new Date().setHours(0, 0, 0, 0)) && !done
+                    ? 'border-red-500/40 bg-red-500/10 text-red-400'
+                    : 'border-border/60 bg-muted/40 text-muted-foreground'
+                )}
+              >
+                <Calendar className="h-2.5 w-2.5" />
+                {formatDate(task.dueDate)}
               </span>
-            </div>
-          )}
+            )}
+            {Array.isArray(task.tags) && task.tags.length > 0 && (
+              <span className="flex flex-wrap gap-1">
+                {task.tags.slice(0, 3).map((tt: any, i: number) => (
+                  <TagPill key={tt?.tag?.id || tt?.tagId || `${tt?.tag?.name}-${i}`} tag={tt.tag || tt} />
+                ))}
+                {task.tags.length > 3 && (
+                  <span className="text-[10px] text-muted-foreground">+{task.tags.length - 3}</span>
+                )}
+              </span>
+            )}
+            {task.project && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: task.project.color, boxShadow: `0 0 8px -1px ${task.project.color}` }}
+                />
+                <span className="max-w-[110px] truncate">{task.project.name}</span>
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -128,50 +142,66 @@ function Column({
   onAdd: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id });
+  const Icon = col.icon;
 
   return (
     <div
       className={cn(
-        'w-72 flex flex-col rounded-2xl tf-glass border-t-4',
-        col.color,
-        isOver && 'ring-2 ring-primary/30'
+        'flex w-[272px] shrink-0 flex-col rounded-3xl border tf-glass overflow-hidden',
+        isOver && 'ring-2 ring-primary/40'
       )}
       style={{
-        boxShadow: `0 0 28px -10px ${(col as any).tint || '#888888'}`,
-        background: `linear-gradient(180deg, ${(col as any).tint}14, transparent 40%), hsl(var(--card) / 0.62)`,
+        borderColor: `${col.tint}45`,
+        boxShadow: `0 0 28px -12px ${col.tint}88, inset 0 1px 0 rgba(255,255,255,.05)`,
+        background: `linear-gradient(180deg, ${col.tint}14, transparent 32%), hsl(var(--card) / 0.62)`,
+        maxHeight: '100%',
       }}
     >
-      <div className="flex items-center justify-between px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold" style={{ color: (col as any).tint }}>{col.title}</h3>
-          <span
-            className="text-xs font-semibold px-2 py-0.5 rounded-full tabular-nums"
-            style={{
-              color: (col as any).tint,
-              background: `${(col as any).tint}1a`,
-              border: `1px solid ${(col as any).tint}55`,
-            }}
-          >
-            {tasks.length}
-          </span>
-        </div>
+      <div
+        className="flex items-center gap-2 px-3.5 pt-3 pb-2.5 border-b"
+        style={{ borderColor: `${col.tint}33` }}
+      >
+        <span
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl"
+          style={{ color: col.tint, background: `${col.tint}16`, border: `1px solid ${col.tint}55`, boxShadow: `0 0 12px -4px ${col.tint}` }}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <h3 className="flex-1 truncate text-[13px] font-semibold" style={{ color: col.tint }}>{col.title}</h3>
+        <span
+          className="rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums"
+          style={{ color: col.tint, background: `${col.tint}16`, border: `1px solid ${col.tint}55` }}
+        >
+          {tasks.length}
+        </span>
         <button
           onClick={onAdd}
-          className="p-1 rounded hover:bg-accent text-muted-foreground"
+          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           title="Добавить задачу"
         >
           <Plus className="h-4 w-4" />
         </button>
       </div>
 
-      <div ref={setNodeRef} className="flex-1 overflow-y-auto px-2 pb-3 space-y-2 min-h-[120px]">
+      <div ref={setNodeRef} className="flex-1 min-h-[140px] max-h-[calc(100dvh-360px)] lg:max-h-none overflow-y-auto px-2.5 py-2.5 space-y-2 overscroll-contain">
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-6">Перетащите сюда</p>
+            <p className="rounded-2xl border border-dashed border-border/60 px-3 py-8 text-center text-xs text-muted-foreground">Перетащите сюда</p>
           ) : (
             tasks.map((task) => <KanbanCard key={task.id} task={task} />)
           )}
         </SortableContext>
+      </div>
+
+      <div className="p-2.5 pt-1">
+        <button
+          onClick={onAdd}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed px-3 py-2 text-xs font-medium transition-all hover:bg-primary/10"
+          style={{ borderColor: `${col.tint}55`, color: col.tint }}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Добавить задачу
+        </button>
       </div>
     </div>
   );
@@ -185,7 +215,6 @@ export function KanbanBoard() {
     currentView,
     createTask,
     updateTask,
-    completeTask,
     currentProjectId,
   } = useTasksStore();
 
@@ -243,14 +272,14 @@ export function KanbanBoard() {
     let newStatus: string | null = null;
 
     // Dropped on a column
-    if (COLUMNS.some((c) => c.id === over.id)) {
+    const colIds = COLUMNS.map((c) => c.id);
+    if (colIds.includes(String(over.id))) {
       newStatus = String(over.id);
     } else {
       // Dropped on another card — use that card's status
       const overTask = allTasks.find((t) => t.id === over.id);
       if (overTask) {
-        newStatus =
-          overTask.status === 'CANCELLED' ? 'TODO' : overTask.status;
+        newStatus = overTask.status === 'CANCELLED' ? 'TODO' : overTask.status;
       }
     }
 
@@ -267,8 +296,8 @@ export function KanbanBoard() {
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
     >
-      <div className="flex-1 overflow-x-auto p-4">
-        <div className="flex gap-3 h-full min-w-max">
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4">
+        <div className="flex gap-3 h-full min-w-max items-stretch pb-1">
           {columns.map((col) => (
             <Column
               key={col.id}
@@ -277,19 +306,12 @@ export function KanbanBoard() {
               onAdd={() => handleQuickAdd(col.id)}
             />
           ))}
-          <div className="tf-glass hidden w-72 shrink-0 self-center rounded-2xl p-4 text-center xl:block">
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Двигайся к цели
-              <br />
-              шаг за шагом
-            </p>
-          </div>
         </div>
       </div>
 
       <DragOverlay>
         {activeTask ? (
-          <div className="w-72 rounded-lg border bg-card p-3 shadow-lg opacity-90">
+          <div className="w-72 rounded-2xl border border-primary/40 bg-card p-3 shadow-xl opacity-95">
             <p className="text-sm font-medium">{activeTask.title}</p>
           </div>
         ) : null}

@@ -148,10 +148,75 @@ function loadStoredMode(): DisplayMode {
   }
 }
 
+const OVERDUE_SEEN_KEY = 'tf-overdue-seen';
+const OVERDUE_HISTORY_KEY = 'tf-overdue-history';
+
+function loadOverdueSeen(): Record<string, number> {
+  try {
+    if (typeof window === 'undefined') return {};
+    return JSON.parse(localStorage.getItem(OVERDUE_SEEN_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveOverdueSeen(map: Record<string, number>) {
+  try {
+    localStorage.setItem(OVERDUE_SEEN_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+export function loadOverdueHistory(): { autoRemoved: number; lastAt: string | null } {
+  try {
+    if (typeof window === 'undefined') return { autoRemoved: 0, lastAt: null };
+    return JSON.parse(localStorage.getItem(OVERDUE_HISTORY_KEY) || '{"autoRemoved":0,"lastAt":null}');
+  } catch {
+    return { autoRemoved: 0, lastAt: null };
+  }
+}
+
+function saveOverdueHistory(h: { autoRemoved: number; lastAt: string | null }) {
+  try {
+    localStorage.setItem(OVERDUE_HISTORY_KEY, JSON.stringify(h));
+  } catch {}
+}
+
+/** Отмечает просроченные как «увиденные», возвращает id задач старше 24ч для автоудаления */
+export function trackOverdueSeen(tasks: Task[]): string[] {
+  if (typeof window === 'undefined') return [];
+  const seen = loadOverdueSeen();
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+  const currentIds = new Set(tasks.map((t) => t.id));
+  let changed = false;
+  for (const t of tasks) {
+    if (!seen[t.id]) {
+      seen[t.id] = now;
+      changed = true;
+    }
+  }
+  for (const id of Object.keys(seen)) {
+    if (!currentIds.has(id)) {
+      delete seen[id];
+      changed = true;
+    }
+  }
+  if (changed) saveOverdueSeen(seen);
+  return tasks.filter((t) => now - (seen[t.id] || now) >= DAY).map((t) => t.id);
+}
+
+export function recordOverdueAutoRemoved(count: number) {
+  const h = loadOverdueHistory();
+  saveOverdueHistory({
+    autoRemoved: h.autoRemoved + count,
+    lastAt: new Date().toISOString(),
+  });
+}
+
 function mergeFreshInto(list: Task[], gate?: (task: Task) => boolean): Task[] {
   const now = Date.now();
   let result = list;
-  for (const [id, entry] of recentMutations) {
+  for (const [id, entry] of Array.from(recentMutations.entries())) {
     if (now - entry.ts > MUTATION_TTL_MS) {
       recentMutations.delete(id);
       continue;

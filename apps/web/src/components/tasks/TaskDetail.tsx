@@ -258,6 +258,19 @@ const handleDueDateChange = (value: string) => {
     save({ tagIds: next });
   };
 
+  const handleDeleteTag = async (tagId: string, tagName: string) => {
+    if (!confirm(`Удалить тег «${tagName}» у всех задач?`)) return;
+    try {
+      await api.deleteTag(tagId);
+      setTags((prev) => prev.filter((t) => t.id !== tagId));
+      const next = selectedTagIds.filter((id) => id !== tagId);
+      setSelectedTagIds(next);
+      if (selectedTaskId) await save({ tagIds: next });
+    } catch (err: any) {
+      alert(err?.message || 'Не удалось удалить тег');
+    }
+  };
+
 
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -591,21 +604,28 @@ const handleDueDateChange = (value: string) => {
               {tags.map((tag) => {
                 const active = selectedTagIds.includes(tag.id);
                 return (
-                  <button
+                  <span
                     key={tag.id}
-                    onClick={() => toggleTag(tag.id)}
                     className={cn(
-                      'text-xs px-2 py-0.5 rounded-full border transition-colors',
+                      'group/tag inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border transition-colors',
                       active
                         ? 'bg-primary/15 border-primary text-primary'
                         : 'border-border text-muted-foreground hover:border-primary/50'
                     )}
                   >
-                    <span className="inline-flex items-center gap-1">
+                    <button type="button" onClick={() => toggleTag(tag.id)} className="inline-flex items-center gap-1">
                       <TagIcon icon={tag.icon} />
                       {tag.name}
-                    </span>
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      title={`Удалить тег «${tag.name}»`}
+                      onClick={() => void handleDeleteTag(tag.id, tag.name)}
+                      className="hidden rounded-full p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 group-hover/tag:inline-flex"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
                 );
               })}
               {showTagInput ? (

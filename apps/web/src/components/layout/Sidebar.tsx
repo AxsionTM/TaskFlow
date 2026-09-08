@@ -11,13 +11,9 @@ import {
   Folder,
   Inbox,
   Plus,
-  Settings,
   Target,
   Timer,
   Search,
-  LogOut,
-  Download,
-  X,
   Trash2,
   ListTodo,
   Activity,
@@ -39,7 +35,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTheme } from 'next-themes';
 import { SearchDialog } from './SearchDialog';
-import { api } from '@/lib/api';
 
 const smartViews = [
   { id: 'today', label: 'Сегодня', icon: CalendarCheck },
@@ -56,7 +51,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const { projects, fetchProjects, createProject, deleteProject } = useProjectsStore();
   const focusRunning = useFocusStore((s) => s.isRunning);
   const focusPaused = useFocusStore((s) => s.isPaused);
@@ -72,7 +67,6 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     fetchProjects();
@@ -119,28 +113,6 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
     } finally {
       setCreating(false);
     }
-  };
-
-  const handleExport = async (format: 'json' | 'csv') => {
-    const token = api.getToken();
-    const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/export/${format}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      alert('Ошибка экспорта');
-      return;
-    }
-    const blob = await res.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download =
-      format === 'json'
-        ? `taskflow-export-${new Date().toISOString().slice(0, 10)}.json`
-        : `taskflow-tasks-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    setShowSettings(false);
   };
 
   return (
@@ -408,18 +380,6 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               <Trash2 className="h-4 w-4" />
               Корзина
             </button>
-            <button
-              onClick={() => handleViewClick('profile')}
-              className={cn(
-                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-                currentView === 'profile'
-                  ? 'tf-nav-active'
-                  : 'text-foreground hover:bg-accent'
-              )}
-            >
-              <Settings className="h-4 w-4" />
-              Настройки
-            </button>
           </div>
         </nav>
 
@@ -438,43 +398,14 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
           </button>
 
           <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-          >
-            <Settings className="h-4 w-4" />
-            Настройки
-          </button>
-          {showSettings && (
-            <div className="px-2 py-1 space-y-1">
-              <button
-                onClick={() => handleExport('json')}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-accent text-muted-foreground"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Экспорт JSON
-              </button>
-              <button
-                onClick={() => handleExport('csv')}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-accent text-muted-foreground"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Экспорт CSV
-              </button>
-            </div>
-          )}
-          <button
             onClick={() => handleViewClick('profile')}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+            className={cn(
+              'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+              currentView === 'profile' ? 'tf-nav-active' : 'text-foreground hover:bg-accent'
+            )}
           >
             <Logo size={18} />
             <span className="truncate flex-1 text-left">{user?.name || 'Профиль'}</span>
-          </button>
-          <button
-            onClick={logout}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent text-muted-foreground"
-          >
-            <LogOut className="h-4 w-4" />
-            Выйти
           </button>
         </div>
       </aside>

@@ -49,7 +49,8 @@ interface PointNode extends GraphNode {
   fixed?: boolean;
 }
 interface Camera { x: number; y: number; zoom: number }
-interface Props { nodes: GraphNode[]; edges: GraphEdge[]; onOpenTask?: (taskId: string) => void; hideTimeline?: boolean; colorMode?: 'priority' | 'cluster' }
+export interface SelectedDayInfo { dateKey: string; label: string; color: string; roots: GraphNode[]; descendantCount: number }
+interface Props { nodes: GraphNode[]; edges: GraphEdge[]; onOpenTask?: (taskId: string) => void; hideTimeline?: boolean; colorMode?: 'priority' | 'cluster'; onSelectedDay?: (info: SelectedDayInfo | null) => void; embeddedPanel?: boolean }
 
 const PRIORITY_COLOR: Record<string, string> = {
   HIGH: '#ef4444',
@@ -67,7 +68,7 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-export function ObsidianGraph({ nodes, edges, onOpenTask, hideTimeline, colorMode }: Props) {
+export function ObsidianGraph({ nodes, edges, onOpenTask, hideTimeline, colorMode, onSelectedDay, embeddedPanel }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const pointsRef = useRef<PointNode[]>([]);
@@ -272,6 +273,19 @@ export function ObsidianGraph({ nodes, edges, onOpenTask, hideTimeline, colorMod
   const expandedDescendantCount=useMemo(()=>{if(!expandedDate)return 0;return Math.max(0,Array.from(visibleTaskIds).length-expandedRoots.length);},[expandedDate,visibleTaskIds,expandedRoots.length]);
   const expandedDateNode=dateNodes.find(n=>n.dateKey===expandedDate);
 
+  // Пробрасываем выбранный день наружу — панель рисуется в правом сайдбаре, а не поверх графа.
+  useEffect(() => {
+    if (!onSelectedDay) return;
+    if (!expandedDateNode) { onSelectedDay(null); return; }
+    onSelectedDay({
+      dateKey: expandedDateNode.dateKey ?? '',
+      label: expandedDateNode.label,
+      color: expandedDateNode.color,
+      roots: expandedRoots,
+      descendantCount: expandedDescendantCount,
+    });
+  }, [expandedDateNode, expandedRoots, expandedDescendantCount, onSelectedDay]);
+
   return <div className="graph-view flex min-h-0 flex-1 flex-col">
     <div className="graph-toolbar flex flex-wrap items-center gap-2 border-b px-5 py-3">
       <div className="graph-search min-w-[220px] flex-1">
@@ -290,9 +304,8 @@ export function ObsidianGraph({ nodes, edges, onOpenTask, hideTimeline, colorMod
     {mobileControlsOpen&&<div className="graph-mobile-controls hidden border-b px-3 py-2"><div className="flex items-center justify-between rounded-xl border bg-card p-1"><button title="Уменьшить" onClick={()=>zoomAt(.85)} className="flex h-10 flex-1 items-center justify-center rounded-lg hover:bg-accent"><Minus className="h-4 w-4"/></button><button title="Увеличить" onClick={()=>zoomAt(1.18)} className="flex h-10 flex-1 items-center justify-center rounded-lg hover:bg-accent"><Plus className="h-4 w-4"/></button><button title="Вписать граф" onClick={fitView} className="flex h-10 flex-1 items-center justify-center rounded-lg hover:bg-accent"><Maximize2 className="h-4 w-4"/></button><button title="Сбросить" onClick={reset} className="flex h-10 flex-1 items-center justify-center rounded-lg hover:bg-accent"><RotateCcw className="h-4 w-4"/></button><button title={running?'Пауза физики':'Запустить физику'} onClick={()=>setRunning(v=>!v)} className="flex h-10 flex-1 items-center justify-center rounded-lg hover:bg-accent">{running?<Pause className="h-4 w-4"/>:<Play className="h-4 w-4"/>}</button></div></div>}
     <div ref={wrapRef} className="relative min-h-0 flex-1 overflow-hidden bg-background">
       <canvas ref={canvasRef} className="absolute inset-0 touch-none cursor-grab active:cursor-grabbing" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} onWheel={handleWheel} onDoubleClick={()=>selected?.taskId&&onOpenTask?.(selected.taskId)}/>
-      <div className="graph-info pointer-events-none absolute left-4 top-4 rounded-xl border bg-card/90 px-3 py-2 text-xs shadow-sm backdrop-blur"><div className="font-semibold">Дни и задачи</div><div className="mt-1 text-muted-foreground">{dateNodes.length} дней · {expandedDate?`${visibleTaskIds.size} узлов`:'выберите день'}</div><div className="mt-1 text-[10px] text-muted-foreground">Нажмите день — раскрыть всю иерархию · перетаскивание — навигация · колесо — масштаб</div></div>
       <div className="graph-date-chips pointer-events-none absolute bottom-4 left-4 flex max-w-[620px] flex-wrap gap-1.5">{dateNodes.map(date=><button key={date.id} onClick={()=>{setSelectedId(date.id);setExpandedDate(date.dateKey??null);}} className={cn('pointer-events-auto rounded-full border px-2.5 py-1 text-[11px] transition-all',expandedDate===date.dateKey?'scale-105 bg-accent':'bg-card/85')}><span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{background:date.color}}/>{date.label}</button>)}</div>
-      {expandedDateNode&&<div className="graph-selected-day absolute right-4 top-4 w-80 rounded-2xl border bg-card/95 p-4 shadow-xl backdrop-blur"><div className="flex items-start gap-3"><span className="mt-1 h-4 w-4 shrink-0 rounded-full" style={{background:expandedDateNode.color,boxShadow:`0 0 18px ${hexToRgba(expandedDateNode.color,.45)}`}}/><div className="min-w-0 flex-1"><div className="text-[10px] uppercase tracking-[.18em] text-muted-foreground">Выбранный день</div><div className="mt-1 text-lg font-semibold">{expandedDateNode.label}</div><div className="mt-1 text-xs text-muted-foreground">{expandedRoots.length?`${expandedRoots.length} задач · ${expandedDescendantCount} подзадач раскрыто`:'На этот день открытых задач нет'}</div></div><button onClick={()=>setExpandedDate(null)} className="rounded p-1 hover:bg-accent"><X className="h-4 w-4"/></button></div><div className="mt-4 space-y-1.5 max-h-72 overflow-y-auto">{expandedRoots.map(task=><button key={task.id} onClick={()=>onOpenTask?.(task.taskId!)} className="flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs hover:bg-accent"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{background:PRIORITY_COLOR[task.priority||'NONE']}}/><span className="min-w-0 flex-1 truncate">{task.label}</span><span className="text-[10px] text-muted-foreground">{visibleTaskIds.has(task.taskId!)?'+' :''}</span></button>)}</div></div>}
+      {expandedDateNode&&!embeddedPanel&&<div className="graph-selected-day absolute right-4 top-4 w-80 rounded-2xl border bg-card/95 p-4 shadow-xl backdrop-blur"><div className="flex items-start gap-3"><span className="mt-1 h-4 w-4 shrink-0 rounded-full" style={{background:expandedDateNode.color,boxShadow:`0 0 18px ${hexToRgba(expandedDateNode.color,.45)}`}}/><div className="min-w-0 flex-1"><div className="text-[10px] uppercase tracking-[.18em] text-muted-foreground">Выбранный день</div><div className="mt-1 text-lg font-semibold">{expandedDateNode.label}</div><div className="mt-1 text-xs text-muted-foreground">{expandedRoots.length?`${expandedRoots.length} задач · ${expandedDescendantCount} подзадач раскрыто`:'На этот день открытых задач нет'}</div></div><button onClick={()=>setExpandedDate(null)} className="rounded p-1 hover:bg-accent"><X className="h-4 w-4"/></button></div><div className="mt-4 space-y-1.5 max-h-72 overflow-y-auto">{expandedRoots.map(task=><button key={task.id} onClick={()=>onOpenTask?.(task.taskId!)} className="flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs hover:bg-accent"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{background:PRIORITY_COLOR[task.priority||'NONE']}}/><span className="min-w-0 flex-1 truncate">{task.label}</span><span className="text-[10px] text-muted-foreground">{visibleTaskIds.has(task.taskId!)?'+' :''}</span></button>)}</div></div>}
       {!expandedDate && <div className="graph-empty-hint pointer-events-none absolute inset-0 flex items-center justify-center"><div className="rounded-2xl border bg-card/80 px-5 py-4 text-center shadow-sm backdrop-blur"><div className="text-sm font-semibold">Выберите день</div><p className="mt-1 text-xs text-muted-foreground">Сегодня — жёлтый центральный узел. Нажмите любой день, чтобы сразу увидеть задачи и все их подзадачи.</p></div></div>}
     </div>
   </div>;

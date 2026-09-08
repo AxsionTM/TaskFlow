@@ -37,8 +37,10 @@ export function TaskCard({
     task.project?.color ||
     PRIORITY_TINT[task.priority || 'NONE'] ||
     '#888888';
-  const tag = task.tags?.[0]?.tag || null;
-  const tagName = tag ? tag.name : task.project?.name || '';
+  const allTags: any[] = Array.isArray(task.tags)
+    ? task.tags.map((tt: any) => tt?.tag || tt).filter(Boolean)
+    : [];
+  const tagName = allTags.length ? '' : task.project?.name || '';
   const letter = (task.title || '?').trim().slice(0, 1).toUpperCase();
   const checked = task.status === 'COMPLETED';
 
@@ -98,11 +100,17 @@ export function TaskCard({
         >
           {task.title}
         </span>
-        {tagName && (
-          <span className="mt-1 inline-block">
-            <TagPill tag={tag || { name: tagName, color: task.project?.color }} />
+        {allTags.length > 0 ? (
+          <span className="mt-1.5 flex flex-wrap gap-1">
+            {allTags.map((t: any, i: number) => (
+              <TagPill key={t.id || `${t.name}-${i}`} tag={t} />
+            ))}
           </span>
-        )}
+        ) : tagName ? (
+          <span className="mt-1 inline-block">
+            <TagPill tag={{ name: tagName, color: task.project?.color }} />
+          </span>
+        ) : null}
       </span>
       {taskTimeLabel(task) && (
         <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{taskTimeLabel(task)}</span>

@@ -55,10 +55,44 @@ const MAP: Record<string, any> = {
   tag: TagGlyph,
 };
 
-/** Контурная иконка тега. Старые эмодзи-значения показывает текстом. */
+/** Старые эмодзи-значения маппим на контурные SVG — системных эмодзи в UI нет. */
+const EMOJI_MAP: Record<string, string> = {
+  '💼': 'briefcase',
+  '🏋': 'dumbbell',
+  '💪': 'dumbbell',
+  '✨': 'sparkles',
+  '🌱': 'sprout',
+  '🌿': 'sprout',
+  '🏠': 'home',
+  '🛒': 'shopping-cart',
+  '📚': 'book',
+  '📖': 'book',
+  '🎯': 'target',
+  '💡': 'lightbulb',
+  '⭐': 'star',
+  '🔥': 'flame',
+  '❤': 'heart',
+  '❤️': 'heart',
+  '🎵': 'music',
+  '🎶': 'music',
+  '☕': 'coffee',
+  '🚗': 'car',
+  '✈': 'plane',
+  '🎁': 'gift',
+  '🎨': 'palette',
+  '📷': 'camera',
+  '💻': 'code',
+  '🏆': 'trophy',
+  '🚀': 'rocket',
+  '🔔': 'bell',
+};
+
+/** Контурная монохромная SVG-иконка тега (Lucide outline, без фона). Цвет — через CSS currentColor. */
 export function TagIcon({ icon, className }: { icon?: string | null; className?: string }) {
-  if (!icon) return null;
-  const C = MAP[icon];
+  if (!icon) return <TagGlyph className={cn('h-3 w-3', className)} />;
+  const key = EMOJI_MAP[icon] || icon;
+  const C = MAP[key];
   if (C) return <C className={cn('h-3 w-3', className)} />;
-  return <span className={className}>{icon}</span>;
+  // Неизвестное значение — аккуратный дефолтный контур, а не сырой эмодзи-текст
+  return <TagGlyph className={cn('h-3 w-3', className)} />;
 }

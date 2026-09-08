@@ -9,7 +9,7 @@ import { TagPill } from "@/components/tasks/TagPill";
 import { TagIcon } from "@/components/tasks/TagIcon";
 import { CreateTaskModal } from "@/components/tasks/CreateTaskModal";
 import { QuickGlance, MiniCalendar, UpcomingBirthdays } from "@/components/views/SidePanels";
-import { ChevronLeft, ChevronRight, Calendar as CalIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalIcon, Cake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const PRIORITY_PILL: Record<string, { label: string; color: string }> = {
@@ -225,7 +225,7 @@ export function AgendaView(){
       <div className="grid grid-cols-7 gap-1.5">
         {weekStrip.map(w=>{const active=startOfDay(w.date).getTime()===day.getTime();const isToday=w.offset===0;return <button key={w.offset} type="button" onClick={()=>setDayOffset(w.offset)} className={cn("rounded-xl border px-1 py-1.5 text-center transition-all",active?"tf-chip-active":"tf-chip")}><span className="block text-[10px] capitalize opacity-80">{w.wd}</span><span className={cn("block text-sm font-semibold tabular-nums",isToday&&!active&&"text-primary")}>{w.num}</span></button>;})}
       </div>
-      {dayBirthdays.length>0&&<div className="flex flex-wrap gap-1.5">{dayBirthdays.map(b=><span key={b.id} className="inline-flex items-center gap-1 rounded-full border border-pink-500/40 bg-pink-500/10 px-2.5 py-1 text-[11px] text-pink-300" style={{boxShadow:"0 0 10px -3px #ec489988"}}>🎂 {b.name}</span>)}</div>}
+      {dayBirthdays.length>0&&<div className="flex flex-wrap gap-1.5">{dayBirthdays.map(b=><span key={b.id} className="inline-flex items-center gap-1 rounded-full border border-pink-500/40 bg-pink-500/10 px-2.5 py-1 text-[11px] text-pink-300" style={{boxShadow:"0 0 10px -3px #ec489988"}}><Cake className="h-3 w-3" />{b.name}</span>)}</div>}
     </div>
     <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_300px]">
     <div className="flex min-h-0 min-w-0 flex-col">

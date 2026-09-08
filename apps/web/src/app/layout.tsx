@@ -10,6 +10,20 @@ export const metadata: Metadata = {
   title: 'TaskFlow — планируй. выполняй. развивайся.',
   description: 'TaskFlow — единое пространство для задач, проектов, привычек, целей и фокус-режима.',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.png', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    shortcut: '/favicon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'TaskFlow',
+    statusBarStyle: 'black-translucent',
+  },
   other: {
     'mobile-web-app-capable': 'yes',
   },

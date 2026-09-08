@@ -1,17 +1,43 @@
 'use client';
 
-import { useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
-import { useTasksStore } from '@/stores/tasks';
+import { useEffect, useState } from 'react';
+import { Loader2, AlarmClock, TimerOff, History } from 'lucide-react';
+import { useTasksStore, trackOverdueSeen, recordOverdueAutoRemoved, loadOverdueHistory } from '@/stores/tasks';
 import { TaskCard } from '@/components/tasks/TaskCard';
 
 export function OverdueView() {
-  const { overdueTasks, todayTasks, tasks, isLoading, fetchOverdue, fetchToday } = useTasksStore();
+  const { overdueTasks, todayTasks, tasks, isLoading, fetchOverdue, fetchToday, deleteTask } = useTasksStore();
+  const [cleaning, setCleaning] = useState(false);
+  const [history, setHistory] = useState(() => loadOverdueHistory());
 
   useEffect(() => {
     fetchOverdue();
     fetchToday();
   }, [fetchOverdue, fetchToday]);
+
+  // Автоудаление: задача живёт в «Просроченных» 24 часа, затем уходит в корзину.
+  // Счётчик истории сохраняется отдельно и не теряется после удаления.
+  useEffect(() => {
+    if (!overdueTasks.length || cleaning) return;
+    const expired = trackOverdueSeen(overdueTasks);
+    if (expired.length === 0) return;
+    setCleaning(true);
+    (async () => {
+      let removed = 0;
+      for (const id of expired) {
+        try {
+          await deleteTask(id);
+          removed += 1;
+        } catch {}
+      }
+      if (removed > 0) {
+        recordOverdueAutoRemoved(removed);
+        setHistory(loadOverdueHistory());
+      }
+      setCleaning(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overdueTasks.length]);
 
   const total = overdueTasks.length;
   const todayCount = todayTasks.filter((t: any) => t.status !== 'COMPLETED').length;
@@ -34,6 +60,21 @@ export function OverdueView() {
         <div className="mb-4">
           <h2 className="text-2xl font-bold tracking-tight">Просроченные</h2>
           <p className="text-sm text-muted-foreground mt-0.5">Задачи, которые нужно сделать</p>
+        </div>
+
+        <div className="tf-glass mb-3 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-500">
+            <TimerOff className="h-4 w-4" />
+          </span>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Просроченные задачи автоматически удаляются через 24 часа.
+            {history.autoRemoved > 0 && (
+              <span className="mt-0.5 flex items-center gap-1 text-[11px]">
+                <History className="h-3 w-3" />
+                Уже убрано автоматически: {history.autoRemoved}
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="grid grid-cols-3 gap-3 mb-4">
@@ -64,8 +105,8 @@ export function OverdueView() {
         )}
 
         <div className="tf-glass rounded-2xl p-4 flex items-center gap-3">
-          <span className="text-3xl shrink-0" role="img" aria-label="Будильник">
-            ⏰
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">
+            <AlarmClock className="h-5 w-5" />
           </span>
           <div>
             <p className="text-sm font-semibold">Не откладывай важное!</p>

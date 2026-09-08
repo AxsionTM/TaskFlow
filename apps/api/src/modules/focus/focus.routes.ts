@@ -23,7 +23,7 @@ router.post('/sessions', async (req: AuthRequest, res, next) => {
     const data = z
       .object({
         taskId: z.string().optional().nullable(),
-        durationMin: z.number().min(1),
+        durationMin: z.number().min(0.1),
         type: z.string().optional(),
         startedAt: z.string().datetime(),
         endedAt: z.string().datetime().optional().nullable(),

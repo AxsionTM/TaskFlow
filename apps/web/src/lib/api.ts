@@ -163,6 +163,10 @@ class ApiClient {
     return this.request<{ tag: any }>('/tags', { method: 'POST', body: JSON.stringify(data) });
   }
 
+  deleteTag(id: string) {
+    return this.request<{ success: boolean }>(`/tags/${id}`, { method: 'DELETE' });
+  }
+
 
   getTrash() {
     return this.request<{ tasks: any[] }>('/tasks/trash/list');
