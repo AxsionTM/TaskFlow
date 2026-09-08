@@ -321,6 +321,97 @@ class ApiClient {
   updateProfile(data: any) {
     return this.request<{ user: any }>('/auth/me', { method: 'PATCH', body: JSON.stringify(data) });
   }
+
+  // --- Admin (требует роль ADMIN на backend) ---
+  adminStats() {
+    return this.request<any>('/admin/stats');
+  }
+
+  adminUsers(params?: Record<string, string>) {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<{ users: any[]; total: number; page: number; pageSize: number }>(
+      `/admin/users${query}`
+    );
+  }
+
+  adminUser(id: string) {
+    return this.request<any>(`/admin/users/${id}`);
+  }
+
+  adminRenameUser(id: string, name: string) {
+    return this.request<{ user: any }>(`/admin/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  adminDeposit(id: string, amount: number, comment?: string) {
+    return this.request<{ balance: number; transaction: any }>(`/admin/users/${id}/balance`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, comment }),
+    });
+  }
+
+  adminWithdraw(id: string, amount: number, comment?: string) {
+    return this.request<{ balance: number; transaction: any }>(`/admin/users/${id}/withdraw`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, comment }),
+    });
+  }
+
+  adminSetPlan(id: string, data: { plan: string; startsAt?: string; endsAt?: string | null; price?: number }) {
+    return this.request<{ user: any; subscription: any }>(`/admin/users/${id}/plan`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  adminBlock(id: string, reason?: string) {
+    return this.request<{ ok: boolean }>(`/admin/users/${id}/block`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  adminUnblock(id: string) {
+    return this.request<{ ok: boolean }>(`/admin/users/${id}/unblock`, { method: 'POST' });
+  }
+
+  adminSetRole(id: string, role: string) {
+    return this.request<{ ok: boolean; role: string }>(`/admin/users/${id}/role`, {
+      method: 'POST',
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  adminSubscriptions(params?: Record<string, string>) {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<{ subscriptions: any[]; total: number; page: number; pageSize: number; stats: any }>(
+      `/admin/subscriptions${query}`
+    );
+  }
+
+  adminTransactions(params?: Record<string, string>) {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<{ transactions: any[]; total: number; page: number; pageSize: number }>(
+      `/admin/transactions${query}`
+    );
+  }
+
+  adminRevenue() {
+    return this.request<any>('/admin/revenue');
+  }
+
+  adminLogs(params?: Record<string, string>) {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<{ logs: any[]; total: number; page: number; pageSize: number }>(
+      `/admin/logs${query}`
+    );
+  }
+
+  adminSettings() {
+    return this.request<any>('/admin/settings');
+  }
 }
 
 export const api = new ApiClient();

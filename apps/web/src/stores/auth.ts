@@ -10,6 +10,9 @@ interface User {
   locale?: string;
   birthday?: string | null;
   emailVerified?: boolean;
+  role?: string;
+  plan?: string;
+  balance?: number;
 }
 
 interface AuthState {

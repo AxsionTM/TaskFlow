@@ -158,6 +158,7 @@ router.post('/register', async (req, res, next) => {
         passwordHash,
         name: data.name || data.email.split('@')[0],
         emailVerified: false,
+        lastActiveAt: new Date(),
       },
     });
 
@@ -198,9 +199,10 @@ router.post('/verify-email', codeLimiter, async (req, res, next) => {
     }
 
     await consumeCode(user.email, 'VERIFY_EMAIL', data.code);
+    const now = new Date();
     const updated = await prisma.user.update({
       where: { id: user.id },
-      data: { emailVerified: true },
+      data: { emailVerified: true, emailVerifiedAt: user.emailVerifiedAt || now, lastActiveAt: now },
     });
 
     const inboxId = await ensureInbox(user.id);
@@ -214,6 +216,7 @@ router.post('/verify-email', codeLimiter, async (req, res, next) => {
         theme: updated.theme,
         locale: updated.locale,
         emailVerified: true,
+        role: updated.role,
       },
       token,
       inboxId,
@@ -368,10 +371,11 @@ router.post('/reset-password', codeLimiter, async (req, res, next) => {
     }
 
     const passwordHash = await bcrypt.hash(data.password, 12);
+    const now = new Date();
     const updated = await prisma.user.update({
       where: { id: user.id },
       // Смена пароля доказывает владение почтой → подтверждаем её заодно.
-      data: { passwordHash, emailVerified: true },
+      data: { passwordHash, emailVerified: true, emailVerifiedAt: user.emailVerifiedAt || now, lastActiveAt: now },
     });
     await invalidateCodes(updated.email, 'RESET_PASSWORD');
 
@@ -386,6 +390,7 @@ router.post('/reset-password', codeLimiter, async (req, res, next) => {
         theme: updated.theme,
         locale: updated.locale,
         emailVerified: true,
+        role: updated.role,
       },
       token,
     });
@@ -412,9 +417,15 @@ router.post('/login', async (req, res, next) => {
       throw new AppError(401, 'Неверный email или пароль');
     }
 
+    if (user.isBlocked) {
+      throw new AppError(403, 'Аккаунт заблокирован. Обратитесь в поддержку.', 'ACCOUNT_BLOCKED');
+    }
+
     if (!user.emailVerified) {
       throw new AppError(403, 'Почта не подтверждена. Введите код из письма.', 'EMAIL_NOT_VERIFIED');
     }
+
+    await prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } });
 
     const token = generateToken(user.id);
 
@@ -427,6 +438,7 @@ router.post('/login', async (req, res, next) => {
         locale: user.locale,
         avatarUrl: user.avatarUrl,
         emailVerified: user.emailVerified,
+        role: user.role,
       },
       token,
     });
@@ -448,6 +460,9 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res, next) => {
         locale: true,
         birthday: true,
         emailVerified: true,
+        role: true,
+        plan: true,
+        balance: true,
         createdAt: true,
       },
     });
@@ -492,6 +507,9 @@ router.patch('/me', authMiddleware, async (req: AuthRequest, res, next) => {
         locale: true,
         birthday: true,
         emailVerified: true,
+        role: true,
+        plan: true,
+        balance: true,
         createdAt: true,
       },
     });

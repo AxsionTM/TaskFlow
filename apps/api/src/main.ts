@@ -18,6 +18,7 @@ import { aiRouter } from "./modules/ai/ai.routes";
 import { exportRouter } from "./modules/export/export.routes";
 import { birthdaysRouter } from "./modules/birthdays/birthdays.routes";
 import { graphRouter } from "./modules/graph.routes";
+import { adminRouter } from "./modules/admin/admin.routes";
 import { errorHandler } from "./common/middleware/error-handler";
 import { authMiddleware } from "./common/middleware/auth";
 
@@ -137,6 +138,7 @@ app.use("/ai", authMiddleware, aiRouter);
 app.use("/export", authMiddleware, exportRouter);
 app.use("/birthdays", authMiddleware, birthdaysRouter);
 app.use("/graph", authMiddleware, graphRouter);
+app.use("/admin", adminRouter);
 
 app.use(errorHandler);
 

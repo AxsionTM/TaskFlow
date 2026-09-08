@@ -54,6 +54,15 @@ model User {
   // Email verification: existing users default to true (grandfathered),
   // newly registered users are created with false until they confirm the code.
   emailVerified Boolean   @default(true)
+  emailVerifiedAt DateTime?
+  // Admin: role USER|ADMIN, blocking, balance (native units), plan FREE|PRO|BUSINESS.
+  role          String    @default("USER")
+  isBlocked     Boolean   @default(false)
+  balance       Float     @default(0)
+  plan          String    @default("FREE")
+  planStartedAt DateTime?
+  planExpiresAt DateTime?
+  lastActiveAt  DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -69,8 +78,91 @@ model User {
   smartLists    SmartList[]
   focusSessions FocusSession[]
   notifications Notification[]
+  subscriptions Subscription[]
+  transactions  Transaction[]
 
   @@map("users")
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  SUBSCRIPTION
+  REFUND
+  ADJUSTMENT
+}
+
+enum TransactionStatus {
+  COMPLETED
+  PENDING
+  FAILED
+}
+
+// Движение средств. Баланс меняется ТОЛЬКО вместе с созданием транзакции
+// (атомарно в коде через $transaction).
+model Transaction {
+  id            String            @id @default(cuid())
+  userId        String
+  type          TransactionType
+  amount        Float
+  balanceBefore Float
+  balanceAfter  Float
+  description   String?
+  status        TransactionStatus @default(COMPLETED)
+  adminId       String?
+  createdAt     DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@map("transactions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+// История тарифов пользователя. Активная подписка = ACTIVE с endsAt в будущем
+// (FREE без срока считается активной по умолчанию).
+model Subscription {
+  id            String             @id @default(cuid())
+  userId        String
+  plan          String
+  price         Float              @default(0)
+  startedAt     DateTime           @default(now())
+  endsAt        DateTime?
+  status        SubscriptionStatus @default(ACTIVE)
+  paymentMethod String?
+  transactionId String?
+  createdBy     String?
+  createdAt     DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, endsAt])
+  @@map("subscriptions")
+}
+
+// Журнал действий администраторов.
+model AdminLog {
+  id           String   @id @default(cuid())
+  adminId      String
+  adminEmail   String
+  action       String
+  targetUserId String?
+  description  String?
+  oldValue     String?
+  newValue     String?
+  ip           String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetUserId, createdAt])
+  @@map("admin_logs")
 }
 
 enum VerificationPurpose {
