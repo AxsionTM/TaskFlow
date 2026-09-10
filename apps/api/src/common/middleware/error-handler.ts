@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { recordError } from '../utils/error-log';
+import type { AuthRequest } from './auth';
 
 export class AppError extends Error {
   constructor(
@@ -14,11 +16,20 @@ export class AppError extends Error {
 
 export function errorHandler(
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) {
   if (err instanceof AppError) {
+    if (err.statusCode >= 500) {
+      recordError({
+        endpoint: req.originalUrl || req.url,
+        method: req.method,
+        statusCode: err.statusCode,
+        message: err.message,
+        userId: (req as AuthRequest).userId,
+      });
+    }
     return res.status(err.statusCode).json({
       error: {
         message: err.message,
@@ -37,6 +48,14 @@ export function errorHandler(
   }
 
   console.error(err);
+  recordError({
+    endpoint: req.originalUrl || req.url,
+    method: req.method,
+    statusCode: 500,
+    message: err.message || 'Internal error',
+    stack: err.stack,
+    userId: (req as AuthRequest).userId,
+  });
   return res.status(500).json({
     error: {
       message: 'Внутренняя ошибка сервера',

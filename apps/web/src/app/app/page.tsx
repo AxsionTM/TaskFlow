@@ -15,7 +15,7 @@ import { GlobalQuickAdd } from '@/components/GlobalQuickAdd';
 import { ReminderWorker } from '@/components/ReminderWorker';
 import { MobileNav } from '@/components/mobile/MobileNav';
 import { MobileMoreMenu } from '@/components/mobile/MobileMoreMenu';
-import { Loader2, Menu, X } from 'lucide-react';
+import { Loader2, Menu, X, Wrench } from 'lucide-react';
 
 const MOBILE_TITLES: Record<string, string> = {
   today: 'Сегодня',
@@ -45,7 +45,7 @@ function mobileDateLabel(): string {
 
 export default function AppPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, checkAuth, user } = useAuthStore();
+  const { isAuthenticated, isLoading, checkAuth, user, maintenance } = useAuthStore();
   const { currentView, setCurrentView, setCurrentProject } = useTasksStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -64,6 +64,21 @@ export default function AppPage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Режим обслуживания включается на backend — обычные пользователи видят
+  // этот экран, администраторы продолжают работать (их запросы не блокируются).
+  if (maintenance && user?.role !== 'ADMIN') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#070a12] p-6 text-center text-white">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
+          <Wrench className="h-7 w-7" />
+        </span>
+        <h1 className="text-xl font-bold">Техническое обслуживание</h1>
+        <p className="max-w-sm text-sm text-slate-400">{maintenance.message}</p>
+        <p className="text-xs text-slate-600">TaskFlow скоро вернётся в работу.</p>
       </div>
     );
   }

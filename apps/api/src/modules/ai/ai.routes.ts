@@ -1,9 +1,37 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { AuthRequest } from '../../common/middleware/auth';
+import { prisma } from '../../common/utils/prisma';
+import { AppError } from '../../common/middleware/error-handler';
 
 const router = Router();
 const AI_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+
+// Флаг AI_ASSISTANT (управляется из админки). Кэш 30 секунд.
+let aiFlagCache: { value: boolean; at: number } | null = null;
+
+async function isAiEnabled(): Promise<boolean> {
+  const now = Date.now();
+  if (aiFlagCache && now - aiFlagCache.at < 30000) return aiFlagCache.value;
+  try {
+    const row = await prisma.featureFlag.findUnique({ where: { key: 'AI_ASSISTANT' } });
+    aiFlagCache = { value: row ? row.enabled : true, at: now };
+  } catch {
+    aiFlagCache = { value: true, at: now };
+  }
+  return aiFlagCache.value;
+}
+
+async function assertAiEnabled() {
+  if (!(await isAiEnabled())) {
+    throw new AppError(403, 'AI-помощник временно отключён администратором', 'AI_DISABLED');
+  }
+}
+
+/** Сброс кэша флага — вызывается из админки после изменения. */
+export function invalidateAiFlagCache() {
+  aiFlagCache = null;
+}
 
 /** Local heuristics when Python AI service is offline */
 function localBreakdown(title: string, description?: string) {
@@ -87,6 +115,7 @@ router.post('/breakdown', async (req: AuthRequest, res, next) => {
       })
       .parse(req.body);
 
+    await assertAiEnabled();
     const remote = await callAi('/ai/breakdown', data);
     const result = remote || localBreakdown(data.title, data.description);
     res.json(result);
@@ -104,6 +133,7 @@ router.post('/priority', async (req: AuthRequest, res, next) => {
       })
       .parse(req.body);
 
+    await assertAiEnabled();
     const remote = await callAi('/ai/priority', data);
     const result = remote || localPriority(data.title, data.description);
     res.json(result);
@@ -121,6 +151,7 @@ router.post('/day-plan', async (req: AuthRequest, res, next) => {
       })
       .parse(req.body);
 
+    await assertAiEnabled();
     const remote = await callAi('/ai/day-plan', data);
     const result =
       remote || localDayPlan(data.tasks, data.available_hours ?? 8);
@@ -132,6 +163,7 @@ router.post('/day-plan', async (req: AuthRequest, res, next) => {
 
 router.post('/productivity', async (req: AuthRequest, res, next) => {
   try {
+    await assertAiEnabled();
     const remote = await callAi('/ai/productivity', req.body || {});
     res.json(
       remote || {

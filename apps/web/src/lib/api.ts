@@ -412,6 +412,111 @@ class ApiClient {
   adminSettings() {
     return this.request<any>('/admin/settings');
   }
+
+  adminCreateUser(data: { email: string; password: string; name?: string }) {
+    return this.request<{ user: any }>('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  adminDeleteUser(id: string) {
+    return this.request<{ ok: boolean }>(`/admin/users/${id}`, { method: 'DELETE' });
+  }
+
+  adminSetPassword(id: string, password: string, confirmPassword: string) {
+    return this.request<{ ok: boolean }>(`/admin/users/${id}/password`, {
+      method: 'POST',
+      body: JSON.stringify({ password, confirmPassword }),
+    });
+  }
+
+  adminTasks(params?: Record<string, string>) {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<{ tasks: any[]; total: number; page: number; pageSize: number }>(
+      `/admin/tasks${query}`
+    );
+  }
+
+  adminTask(id: string) {
+    return this.request<{ task: any }>(`/admin/tasks/${id}`);
+  }
+
+  adminUpdateTask(id: string, data: any) {
+    return this.request<{ task: any }>(`/admin/tasks/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  adminDeleteTask(id: string) {
+    return this.request<{ ok: boolean }>(`/admin/tasks/${id}`, { method: 'DELETE' });
+  }
+
+  adminSearch(q: string) {
+    return this.request<{ users: any[]; tasks: any[] }>(`/admin/search?q=${encodeURIComponent(q)}`);
+  }
+
+  adminImpersonate(id: string) {
+    return this.request<{ ok: boolean; user: any }>(`/admin/users/${id}/impersonate`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
+  adminErrors(params?: Record<string, string>) {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<{ errors: any[]; total: number; page: number; pageSize: number; unresolved: number }>(
+      `/admin/errors${query}`
+    );
+  }
+
+  adminResolveError(id: string, resolved: boolean) {
+    return this.request<{ error: any }>(`/admin/errors/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ resolved }),
+    });
+  }
+
+  adminSendNotification(data: { title: string; message: string; userIds?: string[]; all?: boolean }) {
+    return this.request<{ ok: boolean; recipients: number }>('/admin/notifications', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  adminNotificationHistory(params?: Record<string, string>) {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<{ broadcasts: any[]; total: number; page: number; pageSize: number }>(
+      `/admin/notifications${query}`
+    );
+  }
+
+  adminFlags() {
+    return this.request<{ flags: any[] }>('/admin/feature-flags');
+  }
+
+  adminSetFlag(key: string, enabled: boolean) {
+    return this.request<{ flag: any }>(`/admin/feature-flags/${key}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
+  adminMaintenance() {
+    return this.request<{ enabled: boolean; message: string }>('/admin/system/maintenance');
+  }
+
+  adminSetMaintenance(enabled: boolean, message?: string) {
+    return this.request<{ ok: boolean; enabled: boolean }>('/admin/system/maintenance', {
+      method: 'POST',
+      body: JSON.stringify({ enabled, message }),
+    });
+  }
+
+  systemStatus() {
+    return this.request<{ maintenance: { enabled: boolean; message: string } }>('/auth/system/status');
+  }
 }
 
 export const api = new ApiClient();

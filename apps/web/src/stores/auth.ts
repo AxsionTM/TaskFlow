@@ -22,6 +22,8 @@ interface AuthState {
   isAuthenticated: boolean;
   /** email ожидает подтверждения после register/login */
   pendingVerificationEmail: string | null;
+  /** Maintenance mode: показывается полноэкранное уведомление */
+  maintenance: { message: string } | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<{ email: string; devCode?: string }>;
   verifyEmail: (email: string, code: string) => Promise<void>;
@@ -41,13 +43,22 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
   isAuthenticated: false,
   pendingVerificationEmail: null,
+  maintenance: null,
 
   login: async (email, password) => {
     try {
       const { user, token } = await api.login({ email, password });
       api.setToken(token);
-      set({ user, token, isAuthenticated: true, isLoading: false, pendingVerificationEmail: null });
+      set({ user, token, isAuthenticated: true, isLoading: false, pendingVerificationEmail: null, maintenance: null });
     } catch (err) {
+      if (err instanceof ApiError && err.code === 'MAINTENANCE') {
+        try {
+          const s = await api.systemStatus();
+          set({ maintenance: { message: s.maintenance.message } });
+        } catch {
+          set({ maintenance: { message: err.message } });
+        }
+      }
       // Почта не подтверждена → ведём на страницу ввода кода, сессию не создаём.
       if (
         err instanceof ApiError &&
@@ -111,8 +122,18 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     try {
       const { user } = await api.me();
-      set({ user, token, isAuthenticated: true, isLoading: false });
+      set({ user, token, isAuthenticated: true, isLoading: false, maintenance: null });
     } catch (err) {
+      // Maintenance: показываем экран обслуживания вместо приложения.
+      if (err instanceof ApiError && err.code === 'MAINTENANCE') {
+        try {
+          const s = await api.systemStatus();
+          set({ maintenance: { message: s.maintenance.message }, isLoading: false });
+        } catch {
+          set({ maintenance: { message: (err as Error).message }, isLoading: false });
+        }
+        return;
+      }
       // A refresh must not log the user out just because the API is
       // temporarily restarting or the network is unavailable.
       if (err instanceof ApiError && (err.status === 401 || err.status === 404)) {

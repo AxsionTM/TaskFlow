@@ -8,6 +8,33 @@ export interface AuthRequest extends Request {
   userRole?: string;
 }
 
+// Кэш maintenance-флага, чтобы не ходить в БД на каждый запрос.
+let maintenanceCache: { value: boolean; message: string; at: number } | null = null;
+const MAINTENANCE_CACHE_TTL = 15000;
+
+export async function isMaintenanceOn(): Promise<{ enabled: boolean; message: string }> {
+  const now = Date.now();
+  if (maintenanceCache && now - maintenanceCache.at < MAINTENANCE_CACHE_TTL) {
+    return { enabled: maintenanceCache.value, message: maintenanceCache.message };
+  }
+  try {
+    const row = await prisma.systemSetting.findUnique({ where: { key: 'MAINTENANCE_MODE' } });
+    const parsed = row ? (JSON.parse(row.value) as { enabled?: boolean; message?: string }) : null;
+    maintenanceCache = {
+      value: Boolean(parsed?.enabled),
+      message: parsed?.message || 'TaskFlow временно находится на техническом обслуживании.',
+      at: now,
+    };
+  } catch {
+    maintenanceCache = { value: false, message: '', at: now };
+  }
+  return { enabled: maintenanceCache.value, message: maintenanceCache.message };
+}
+
+export function invalidateMaintenanceCache() {
+  maintenanceCache = null;
+}
+
 export async function authMiddleware(
   req: AuthRequest,
   _res: Response,
@@ -25,14 +52,14 @@ export async function authMiddleware(
     const payload = jwt.verify(
       token,
       process.env.JWT_SECRET || 'fallback-secret'
-    ) as { userId: string };
+    ) as { userId: string; iat?: number };
 
     // Проверяем существование, роль и блокировку на каждый запрос:
     // заблокированный пользователь мгновенно теряет доступ к API,
     // даже если JWT ещё не истёк.
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, role: true, isBlocked: true },
+      select: { id: true, role: true, isBlocked: true, passwordChangedAt: true },
     });
 
     if (!user) {
@@ -41,6 +68,24 @@ export async function authMiddleware(
 
     if (user.isBlocked) {
       return next(new AppError(403, 'Аккаунт заблокирован', 'ACCOUNT_BLOCKED'));
+    }
+
+    // Токены, выпущенные до смены пароля, больше недействительны.
+    if (
+      user.passwordChangedAt &&
+      typeof payload.iat === 'number' &&
+      payload.iat * 1000 < user.passwordChangedAt.getTime()
+    ) {
+      return next(new AppError(401, 'Пароль был изменён. Войдите снова.', 'PASSWORD_CHANGED'));
+    }
+
+    // Maintenance mode: администраторы продолжают работать, остальные — нет.
+    // Реализовано на backend-уровне, а не скрытием интерфейса.
+    if (user.role !== 'ADMIN') {
+      const maintenance = await isMaintenanceOn();
+      if (maintenance.enabled) {
+        return next(new AppError(503, maintenance.message, 'MAINTENANCE'));
+      }
     }
 
     req.userId = user.id;

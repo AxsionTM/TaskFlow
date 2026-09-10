@@ -63,6 +63,8 @@ model User {
   planStartedAt DateTime?
   planExpiresAt DateTime?
   lastActiveAt  DateTime?
+  // Инвалидация JWT после смены пароля: токены старше этой метки отклоняются.
+  passwordChangedAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -157,12 +159,53 @@ model AdminLog {
   description  String?
   oldValue     String?
   newValue     String?
+  success      Boolean  @default(true)
   ip           String?
   createdAt    DateTime @default(now())
 
   @@index([createdAt])
   @@index([targetUserId, createdAt])
+  @@index([action, createdAt])
   @@map("admin_logs")
+}
+
+// Реестр ошибок приложения для Error Center (только 5xx, без секретов).
+model ErrorLog {
+  id         String   @id @default(cuid())
+  endpoint   String
+  method     String
+  statusCode Int
+  message    String
+  stack      String?
+  userId     String?
+  count      Int      @default(1)
+  firstSeen  DateTime @default(now())
+  lastSeen   DateTime @default(now())
+  resolved   Boolean  @default(false)
+  resolvedAt DateTime?
+
+  @@index([lastSeen])
+  @@index([resolved, lastSeen])
+  @@map("error_logs")
+}
+
+// Фича-флаги: только реально существующие возможности сервиса.
+model FeatureFlag {
+  key         String   @id
+  description String?
+  enabled     Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+
+  @@map("feature_flags")
+}
+
+// Системные настройки (maintenance mode и т.п.), ключ-значение.
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
 }
 
 enum VerificationPurpose {

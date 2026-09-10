@@ -4,13 +4,12 @@ import { useState } from 'react';
 import {
   LayoutDashboard,
   Users,
-  CreditCard,
-  Receipt,
-  ChartLine,
+  ListTodo,
+  Bell,
+  Bug,
   ScrollText,
-  Settings as SettingsIcon,
+  Server,
   Menu,
-  X,
   LogOut,
   ShieldCheck,
 } from 'lucide-react';
@@ -18,52 +17,71 @@ import { useAuthStore } from '@/stores/auth';
 import { Dashboard } from './Dashboard';
 import { Users as UsersSection } from './Users';
 import { UserDetail } from './UserDetail';
-import { Subscriptions, Transactions, Revenue, Logs, Settings } from './Sections';
+import { Tasks as TasksSection } from './Tasks';
+import { Notifications, Errors, Logs, System } from './Sections';
+import { GlobalSearch } from './GlobalSearch';
 import { useToast } from './ui';
 import { cn } from '@/lib/utils';
 
-type Section = 'dashboard' | 'users' | 'subscriptions' | 'transactions' | 'revenue' | 'logs' | 'settings';
+export type AdminSection =
+  | 'dashboard'
+  | 'users'
+  | 'tasks'
+  | 'notifications'
+  | 'errors'
+  | 'logs'
+  | 'system';
 
-const NAV: { id: Section; label: string; icon: any }[] = [
+const NAV: { id: AdminSection; label: string; icon: any }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'users', label: 'Users', icon: Users },
-  { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
-  { id: 'transactions', label: 'Transactions', icon: Receipt },
-  { id: 'revenue', label: 'Revenue', icon: ChartLine },
-  { id: 'logs', label: 'Logs', icon: ScrollText },
-  { id: 'settings', label: 'Settings', icon: SettingsIcon },
+  { id: 'tasks', label: 'Tasks', icon: ListTodo },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'errors', label: 'Errors', icon: Bug },
+  { id: 'logs', label: 'Audit Log', icon: ScrollText },
+  { id: 'system', label: 'System', icon: Server },
 ];
 
-const TITLES: Record<Section, { title: string; sub: string }> = {
-  dashboard: { title: 'Главная', sub: 'Общая статистика и ключевые показатели' },
-  users: { title: 'Пользователи', sub: 'Управление пользователями и их активностью' },
-  subscriptions: { title: 'Подписки', sub: 'Тарифы, статусы и продления' },
-  transactions: { title: 'Транзакции', sub: 'История финансовых операций' },
-  revenue: { title: 'Доход', sub: 'Финансовая статистика сервиса' },
-  logs: { title: 'Логи', sub: 'Журнал действий администраторов' },
-  settings: { title: 'Настройки', sub: 'Состояние системы' },
+const TITLES: Record<AdminSection, { title: string; sub: string }> = {
+  dashboard: { title: 'Главная', sub: 'Статистика сервиса и быстрые действия' },
+  users: { title: 'Пользователи', sub: 'Управление пользователями' },
+  tasks: { title: 'Задачи', sub: 'Задачи всех пользователей' },
+  notifications: { title: 'Уведомления', sub: 'Массовые системные уведомления' },
+  errors: { title: 'Ошибки', sub: 'Error Center: реальные ошибки приложения' },
+  logs: { title: 'Audit Log', sub: 'Журнал действий администраторов' },
+  system: { title: 'Система', sub: 'Статус, флаги и обслуживание' },
 };
 
 export function AdminPanel() {
   const { user, logout } = useAuthStore();
-  const [section, setSection] = useState<Section>('dashboard');
+  const [section, setSection] = useState<AdminSection>('dashboard');
   const [userId, setUserId] = useState<string | null>(null);
+  const [taskId, setTaskId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const { push, node } = useToast();
 
-  const go = (s: Section) => {
+  const go = (s: AdminSection) => {
     setSection(s);
     setUserId(null);
+    setTaskId(null);
     setMenuOpen(false);
   };
 
   const openUser = (id: string) => {
     setUserId(id);
+    setTaskId(null);
     setSection('users');
     setMenuOpen(false);
   };
 
-  const meta = TITLES[userId ? 'users' : section];
+  const openTask = (id: string) => {
+    setTaskId(id);
+    setUserId(null);
+    setSection('tasks');
+    setMenuOpen(false);
+  };
+
+  const meta = TITLES[userId || taskId ? (userId ? 'users' : 'tasks') : section];
 
   const nav = (
     <div className="flex h-full flex-col">
@@ -79,7 +97,7 @@ export function AdminPanel() {
       <nav className="flex-1 space-y-1 overflow-y-auto px-2">
         {NAV.map((n) => {
           const Icon = n.icon;
-          const active = section === n.id && !userId;
+          const active = section === n.id && !userId && !taskId;
           return (
             <button
               key={n.id}
@@ -129,30 +147,47 @@ export function AdminPanel() {
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 lg:hidden"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 lg:hidden"
               aria-label="Открыть меню"
             >
               <Menu className="h-5 w-5" />
             </button>
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-lg font-bold">{userId ? 'Профиль пользователя' : meta.title}</h1>
-              <p className="hidden truncate text-xs text-slate-500 sm:block">{userId ? 'Карточка пользователя' : meta.sub}</p>
+              <h1 className="truncate text-lg font-bold">
+                {userId ? 'Профиль пользователя' : taskId ? 'Задача' : meta.title}
+              </h1>
+              <p className="hidden truncate text-xs text-slate-500 sm:block">
+                {userId ? 'Карточка пользователя' : taskId ? 'Карточка задачи' : meta.sub}
+              </p>
+            </div>
+            <div className="hidden w-full max-w-xs md:block">
+              <GlobalSearch onOpenUser={openUser} onOpenTask={openTask} />
             </div>
             <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold text-violet-300 sm:flex">
               <ShieldCheck className="h-3.5 w-3.5" /> Admin
             </span>
           </div>
+          <div className="px-4 pb-3 md:hidden">
+            <GlobalSearch onOpenUser={openUser} onOpenTask={openTask} />
+          </div>
         </header>
 
         <main className="mx-auto w-full max-w-6xl p-4">
-          {section === 'dashboard' && !userId && <Dashboard />}
-          {section === 'users' && !userId && <UsersSection onOpen={openUser} />}
-          {section === 'users' && userId && <UserDetail id={userId} onBack={() => setUserId(null)} toast={push} />}
-          {section === 'subscriptions' && <Subscriptions onOpenUser={openUser} />}
-          {section === 'transactions' && <Transactions onOpenUser={openUser} />}
-          {section === 'revenue' && <Revenue />}
+          {section === 'dashboard' && !userId && !taskId && (
+            <Dashboard toast={push} onOpenUser={openUser} onOpenTask={openTask} go={go} />
+          )}
+          {section === 'users' && !userId && <UsersSection onOpen={openUser} toast={push} />}
+          {section === 'users' && userId && (
+            <UserDetail id={userId} onBack={() => setUserId(null)} onOpenTask={openTask} toast={push} />
+          )}
+          {section === 'tasks' && !taskId && <TasksSection onOpen={openTask} initialTaskId={null} toast={push} />}
+          {section === 'tasks' && taskId && (
+            <TasksSection onOpen={openTask} initialTaskId={taskId} onBack={() => setTaskId(null)} toast={push} />
+          )}
+          {section === 'notifications' && <Notifications toast={push} />}
+          {section === 'errors' && <Errors toast={push} />}
           {section === 'logs' && <Logs />}
-          {section === 'settings' && <Settings />}
+          {section === 'system' && <System toast={push} />}
         </main>
       </div>
       {node}

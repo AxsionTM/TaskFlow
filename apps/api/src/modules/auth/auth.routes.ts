@@ -125,6 +125,23 @@ async function findOrCreateOAuthUser(params: {
   return user;
 }
 
+// Публичный статус обслуживания: нужен пользовательской части,
+// чтобы показать maintenance-экран до/без авторизации.
+router.get('/system/status', async (_req, res, next) => {
+  try {
+    const row = await prisma.systemSetting.findUnique({ where: { key: 'MAINTENANCE_MODE' } });
+    const parsed = row ? (JSON.parse(row.value) as { enabled?: boolean; message?: string }) : null;
+    res.json({
+      maintenance: {
+        enabled: Boolean(parsed?.enabled),
+        message: parsed?.message || 'TaskFlow временно находится на техническом обслуживании.',
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/providers', (_req, res) => {
   res.json({
     providers: {
@@ -375,7 +392,8 @@ router.post('/reset-password', codeLimiter, async (req, res, next) => {
     const updated = await prisma.user.update({
       where: { id: user.id },
       // Смена пароля доказывает владение почтой → подтверждаем её заодно.
-      data: { passwordHash, emailVerified: true, emailVerifiedAt: user.emailVerifiedAt || now, lastActiveAt: now },
+      // passwordChangedAt инвалидирует все ранее выпущенные токены.
+      data: { passwordHash, emailVerified: true, emailVerifiedAt: user.emailVerifiedAt || now, lastActiveAt: now, passwordChangedAt: now },
     });
     await invalidateCodes(updated.email, 'RESET_PASSWORD');
 
@@ -426,6 +444,23 @@ router.post('/login', async (req, res, next) => {
     }
 
     await prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } });
+
+    // Вход администратора — в audit log (fire-and-forget).
+    if (user.role === 'ADMIN') {
+      const xff = req.headers['x-forwarded-for'];
+      const ip = (typeof xff === 'string' && xff.length ? xff.split(',')[0].trim() : req.ip)?.slice(0, 64);
+      void prisma.adminLog
+        .create({
+          data: {
+            adminId: user.id,
+            adminEmail: user.email,
+            action: 'ADMIN_LOGIN',
+            description: 'Вход администратора',
+            ip,
+          },
+        })
+        .catch(() => {});
+    }
 
     const token = generateToken(user.id);
 
