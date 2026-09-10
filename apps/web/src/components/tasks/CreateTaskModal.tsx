@@ -245,14 +245,14 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
             </div>
           </div>
         )}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b">
+        <div className="tf-create-head flex items-center justify-between px-5 py-3.5 border-b">
           <h2 className="text-sm font-semibold">Новая задача</h2>
           <button type="button" onClick={handleClose} className="p-1 rounded-lg hover:bg-accent">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="tf-create-body px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
           <Input
             placeholder="Название задачи"
             value={title}
@@ -525,7 +525,7 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-3 border-t bg-muted/20">
+        <div className="tf-create-foot flex justify-end gap-2 px-5 py-3 border-t bg-muted/20">
           <Button type="button" variant="ghost" size="sm" onClick={handleClose}>
             Отмена
           </Button>

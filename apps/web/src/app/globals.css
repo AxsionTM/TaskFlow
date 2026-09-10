@@ -1379,7 +1379,7 @@ body::before {
 
 /* ===== TaskFlow mobile design system (reference mockup, phone only) ===== */
 @media (max-width: 1023px) {
-  /* Место под нижнюю навигацию, чтобы контент не уходил под неё */
+  /* пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅ */
   .mobile-main {
     padding-bottom: calc(84px + env(safe-area-inset-bottom));
   }
@@ -1526,21 +1526,53 @@ body::before {
     color: hsl(var(--primary));
   }
 
-  /* --- Create task modal -> bottom sheet --- */
+  /* --- Create task modal -> bottom sheet ---
+     РџСЂРёС‡РёРЅР° РїСЂРѕС€Р»РѕРіРѕ РїРµСЂРµРєСЂС‹С‚РёСЏ: z-50 РјРѕРґР°Р»РєРё Р±С‹Р» РќРР–Р• РјРѕР±РёР»СЊРЅРѕР№
+     РЅР°РІРёРіР°С†РёРё (z-80), Р° РєРЅРѕРїРєР° В«РЎРѕР·РґР°С‚СЊВ» Р»РµР¶Р°Р»Р° РІ РєРѕРЅС†Рµ СЃРєСЂРѕР»Р»Р° С„РѕСЂРјС‹.
+     РўРµРїРµСЂСЊ: РјРѕРґР°Р»РєР° РІС‹С€Рµ РЅР°РІРёРіР°С†РёРё, С€Р°РїРєР° Рё С„СѓС‚РµСЂ Р·Р°С„РёРєСЃРёСЂРѕРІР°РЅС‹,
+     РїСЂРѕРєСЂСѓС‡РёРІР°РµС‚СЃСЏ С‚РѕР»СЊРєРѕ С‚РµР»Рѕ. */
   .tf-create-modal {
     align-items: flex-end;
     padding: 0;
+    z-index: 95;
   }
   .tf-create-modal > form {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+    max-height: calc(100dvh - 16px);
     border-radius: 28px 28px 0 0;
     border-bottom: none;
-    max-height: calc(100dvh - 40px);
-    overflow-y: auto;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: 0;
     animation: tf-sheet-up 0.25s ease;
   }
+  .tf-create-modal .tf-create-head {
+    flex-shrink: 0;
+  }
+  .tf-create-modal .tf-create-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 16px;
+  }
+  .tf-create-modal .tf-create-foot {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: hsl(var(--card));
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+  .tf-create-modal .tf-create-foot button {
+    min-height: 44px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
 
-  /* --- Компактные карточки и заголовки --- */
+  /* --- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ --- */
   .tf-task-list > div.flex-1 {
     padding-bottom: 8px;
   }
@@ -1548,12 +1580,32 @@ body::before {
     font-size: 1.1rem;
   }
 
-  /* Календарь: компактные ячейки, свайп внутри себя */
+  /* пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ */
   .calendar-scroll .tf-glass.rounded-3xl {
     border-radius: 20px;
   }
 
-  /* Канбан: одна колонка ~78vw со snap */
+  /* Graph: scrolls the AREA under canvas, not canvas itself.
+     Cause: grid was flex-1 min-h-0 without overflow inside
+     overflow-hidden main вЂ” lower cards were cut off unreachable.
+     Canvas keeps touch-pan (touch-none inside). */
+  .tf-graph-grid {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    align-content: start;
+  }
+  .tf-graph-grid .tf-graph-canvas {
+    min-height: min(52dvh, 460px);
+    height: 52dvh;
+    max-height: 520px;
+    flex-shrink: 0;
+  }
+  .tf-graph-grid > .flex.flex-col.gap-4 {
+    padding-bottom: 8px;
+  }
+
+  /* пїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ ~78vw пїЅпїЅ snap */
   .tf-kanban-scroll {
     scroll-snap-type: x mandatory;
     overscroll-behavior-x: contain;
@@ -1563,15 +1615,36 @@ body::before {
     width: min(78vw, 300px);
   }
 
-  /* Фокус: таймер помещается на телефоне */
+  /* пїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ */
   .tf-glass.rounded-3xl .relative.w-64.h-64 {
     width: min(64vw, 240px);
     height: min(64vw, 240px);
   }
 
-  /* Удобные для пальца контролы в шапках */
+  /* пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ */
   .tf-calendar-toolbar button,
   .tf-task-header button {
     min-height: 36px;
+  }
+
+  /* Calendar fits phone width (360px+): no min-width, compact cells.
+     Cause of old overflow: min-w-[620px] forced horizontal scroll. */
+  .tf-cal-grid,
+  .tf-cal-head {
+    min-width: 0;
+  }
+  .tf-cal-cell {
+    height: 84px;
+    padding: 4px;
+    border-radius: 14px;
+  }
+  .tf-cal-cell .tf-cal-time {
+    display: none;
+  }
+}
+@media (max-width: 380px) {
+  .tf-cal-cell {
+    height: 76px;
+    padding: 3px;
   }
 }

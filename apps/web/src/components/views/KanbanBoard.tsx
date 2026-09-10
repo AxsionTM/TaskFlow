@@ -38,7 +38,11 @@ const PRIORITY_DOT: Record<string, string> = {
 };
 
 function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
-  const { setSelectedTask, completeTask, selectedTaskId, updateTask } = useTasksStore();
+  // Только флаг выбора по подписке, экшены — стабильные через getState.
+  const selectedTaskId = useTasksStore((s) => s.selectedTaskId);
+  const setSelectedTask = useTasksStore.getState().setSelectedTask;
+  const completeTask = useTasksStore.getState().completeTask;
+  const updateTask = useTasksStore.getState().updateTask;
   const isSelected = selectedTaskId === task.id;
   const dot = PRIORITY_DOT[task.priority] || PRIORITY_DOT.NONE;
   const done = task.status === 'COMPLETED';

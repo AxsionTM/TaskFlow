@@ -30,7 +30,9 @@ export function TaskCard({
   flat?: boolean;
   ringColor?: string;
 }) {
-  const { setSelectedTask, completeTask } = useTasksStore();
+  // Экшены без подписки: карточка рендерится только по props от родителя.
+  const setSelectedTask = useTasksStore.getState().setSelectedTask;
+  const completeTask = useTasksStore.getState().completeTask;
   const color =
     ringColor ||
     task.tags?.[0]?.tag?.color ||

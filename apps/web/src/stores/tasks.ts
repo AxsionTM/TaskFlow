@@ -213,6 +213,23 @@ export function recordOverdueAutoRemoved(count: number) {
   });
 }
 
+// Дедуплика параллельных одинаковых запросов: Sidebar и вид монтируются
+// одновременно и раньше слали два одинаковых GET (например fetchOverdue).
+// Повторный вызов, пока летит первый, ждёт тот же promise.
+const inflight = new Map<string, Promise<void>>();
+
+function deduped<T extends unknown[]>(key: string, fn: (...args: T) => Promise<void>) {
+  return (...args: T): Promise<void> => {
+    const running = inflight.get(key);
+    if (running) return running;
+    const p = fn(...args).finally(() => {
+      if (inflight.get(key) === p) inflight.delete(key);
+    });
+    inflight.set(key, p);
+    return p;
+  };
+}
+
 function mergeFreshInto(list: Task[], gate?: (task: Task) => boolean): Task[] {
   const now = Date.now();
   let result = list;
@@ -257,7 +274,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
   displayMode: loadStoredMode(),
 
-  fetchTasks: async (params, opts) => {
+  fetchTasks: deduped('tasks', async (params, opts) => {
     const silent = Boolean(opts?.silent);
     if (!silent) set({ isLoading: true });
 
@@ -280,9 +297,9 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         isLoading: false,
       });
     }
-  },
+  }),
 
-  fetchToday: async (opts) => {
+  fetchToday: deduped('today', async (opts: any) => {
     const silent = Boolean(opts?.silent);
     if (!silent) set({ isLoading: true });
 
@@ -298,9 +315,9 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         isLoading: false,
       });
     }
-  },
+  }),
 
-  fetchOverdue: async (opts) => {
+  fetchOverdue: deduped('overdue', async (opts) => {
     void opts;
     try {
       const { tasks } = await api.getOverdueTasks();
@@ -309,7 +326,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         overdueTasks: mergeFreshInto(tasks as Task[], matchesOverdueFilter),
       });
     } catch {}
-  },
+  }),
 
   refreshCurrentView: async (opts) => {
     const {

@@ -11,7 +11,8 @@ export function FocusTicker() {
 
   useEffect(() => {
     if (!isRunning || isPaused) return;
-    const id = setInterval(() => tick(), 250);
+    // 500мс достаточно: tick округляет до целых секунд, а рендеров вдвое меньше.
+    const id = setInterval(() => tick(), 500);
     return () => clearInterval(id);
   }, [isRunning, isPaused, tick]);
 

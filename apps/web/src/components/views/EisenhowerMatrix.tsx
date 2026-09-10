@@ -87,7 +87,9 @@ function getQuadrant(task: any): Quadrant {
 }
 
 function MatrixCard({ task }: { task: any }) {
-  const { setSelectedTask, completeTask, selectedTaskId } = useTasksStore();
+  const selectedTaskId = useTasksStore((s) => s.selectedTaskId);
+  const setSelectedTask = useTasksStore.getState().setSelectedTask;
+  const completeTask = useTasksStore.getState().completeTask;
   const isSelected = selectedTaskId === task.id;
   const done = task.status === 'COMPLETED';
   const meta = PRIORITY_META[task.priority] || PRIORITY_META.NONE;

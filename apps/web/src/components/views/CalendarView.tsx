@@ -161,7 +161,7 @@ export function CalendarView() {
           {/* Month grid — полноценный месячный календарь */}
           <div className="calendar-scroll flex-1 overflow-auto p-2 sm:p-4">
             <div className="tf-glass rounded-3xl p-2 sm:p-3">
-              <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5 min-w-[620px]">
+              <div className="tf-cal-head grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
                 {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d, i) => (
                   <div
                     key={d + i}
@@ -174,7 +174,7 @@ export function CalendarView() {
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 gap-1 sm:gap-1.5 min-w-[620px]">
+              <div className="tf-cal-grid grid grid-cols-7 gap-1 sm:gap-1.5">
                 {monthDays.map((day) => {
                   const key = format(day, 'yyyy-MM-dd');
                   const dayTasks = tasksByDate.get(key) || [];
@@ -193,7 +193,7 @@ export function CalendarView() {
                       onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
                       onDrop={(e) => onDropDay(e, key)}
                       className={cn(
-                        'group relative flex h-[118px] sm:h-[132px] flex-col rounded-2xl border p-1.5 transition-all cursor-pointer overflow-hidden',
+                        'tf-cal-cell group relative flex h-[118px] sm:h-[132px] flex-col rounded-2xl border p-1.5 transition-all cursor-pointer overflow-hidden',
                         'bg-card/40 hover:bg-accent/40',
                         inMonth ? 'border-primary/20' : 'opacity-45 border-border/40',
                         today && 'border-primary/70 shadow-[0_0_22px_-6px_var(--tf-glow)] bg-primary/[0.07]',
@@ -271,7 +271,7 @@ export function CalendarView() {
                                 {task.title}
                               </span>
                               {timeLabel(task.dueDate) && (
-                                <span className="shrink-0 text-[9px] tabular-nums text-muted-foreground">
+                                <span className="tf-cal-time shrink-0 text-[9px] tabular-nums text-muted-foreground">
                                   {timeLabel(task.dueDate)}
                                 </span>
                               )}

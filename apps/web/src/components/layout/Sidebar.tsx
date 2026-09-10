@@ -50,13 +50,49 @@ interface SidebarProps {
   onMobileClose?: () => void;
 }
 
-export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
-  const { user } = useAuthStore();
-  const { projects, fetchProjects, createProject, deleteProject } = useProjectsStore();
+/**
+ * Кнопка «Фокус» с живой подпиской только внутри себя.
+ * Причина: раньше весь Sidebar подписывался на remainingSeconds и
+ * перерисовывался 4 раза в секунду во время фокус-сессии.
+ */
+function FocusNavButton({ active, onClick }: { active: boolean; onClick: () => void }) {
   const focusRunning = useFocusStore((s) => s.isRunning);
   const focusPaused = useFocusStore((s) => s.isPaused);
   const focusRemaining = useFocusStore((s) => s.remainingSeconds);
   const focusMode = useFocusStore((s) => s.mode);
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+        active ? 'tf-nav-active' : 'text-foreground hover:bg-accent',
+        focusRunning && !focusPaused && 'ring-1 ring-emerald-500/50 bg-emerald-500/10'
+      )}
+    >
+      <Timer className={cn('h-4 w-4', focusRunning && !focusPaused && 'text-emerald-500')} />
+      <span className="flex-1 text-left">Фокус</span>
+      {focusRunning && (
+        <span
+          className={cn(
+            'text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-full',
+            focusPaused
+              ? 'bg-muted text-muted-foreground'
+              : focusMode === 'break'
+                ? 'bg-sky-500/20 text-sky-600 dark:text-sky-400'
+                : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 animate-pulse'
+          )}
+        >
+          {formatRemaining(focusRemaining)}
+        </span>
+      )}
+    </button>
+  );
+}
+
+export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
+  const { user } = useAuthStore();
+  const { projects, fetchProjects, createProject, deleteProject } = useProjectsStore();
   const { currentView, setCurrentView, setCurrentProject, overdueTasks, fetchOverdue } =
     useTasksStore();
   const { theme, setTheme } = useTheme();
@@ -300,38 +336,10 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               <Target className="h-4 w-4" />
               Цели
             </button>
-            <button
+            <FocusNavButton
+              active={currentView === 'focus'}
               onClick={() => handleViewClick('focus')}
-              className={cn(
-                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-                currentView === 'focus'
-                  ? 'tf-nav-active'
-                  : 'text-foreground hover:bg-accent',
-                focusRunning && !focusPaused && 'ring-1 ring-emerald-500/50 bg-emerald-500/10'
-              )}
-            >
-              <Timer
-                className={cn(
-                  'h-4 w-4',
-                  focusRunning && !focusPaused && 'text-emerald-500'
-                )}
-              />
-              <span className="flex-1 text-left">Фокус</span>
-              {focusRunning && (
-                <span
-                  className={cn(
-                    'text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-full',
-                    focusPaused
-                      ? 'bg-muted text-muted-foreground'
-                      : focusMode === 'break'
-                        ? 'bg-sky-500/20 text-sky-600 dark:text-sky-400'
-                        : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 animate-pulse'
-                  )}
-                >
-                  {formatRemaining(focusRemaining)}
-                </span>
-              )}
-            </button>
+            />
             <button
               onClick={() => handleViewClick('birthdays')}
               className={cn(

@@ -208,8 +208,8 @@ export function GraphView() {
         </label>
       </header>
 
-      <div className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_270px]">
-        <div className="tf-glass flex min-h-[420px] min-w-0 flex-col overflow-hidden rounded-3xl">
+      <div className="tf-graph-grid grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_270px]">
+        <div className="tf-graph-canvas tf-glass flex min-h-[420px] min-w-0 flex-col overflow-hidden rounded-3xl">
           <div className="flex min-h-0 flex-1 flex-col">
             <ObsidianGraph
               nodes={nodes}
