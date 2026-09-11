@@ -6,6 +6,7 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc",
     "test:admin": "tsx scripts/e2e-admin.mjs",
+    "test:notes": "tsx scripts/e2e-notes.mjs",
     "start": "node dist/main.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma db push",

@@ -21,6 +21,14 @@ const createTaskSchema = z.object({
   recurrenceRule: z.string().optional().nullable(),
   remindMinutes: z.number().int().optional().nullable(),
   remindRepeatMinutes: z.number().int().min(1).max(60).optional().nullable(),
+  // Опциональная заметка: создаётся атомарно вместе с задачей (одна транзакция).
+  noteContent: z
+    .string()
+    .min(1)
+    .max(20000)
+    .refine((s) => s.trim().length > 0, 'Заметка не может быть пустой')
+    .optional()
+    .nullable(),
   tagIds: z.array(z.string()).optional(),
   checklist: z
     .array(z.object({ title: z.string(), isCompleted: z.boolean().optional() }))
@@ -424,6 +432,7 @@ router.get('/:id', async (req: AuthRequest, res, next) => {
         },
         attachments: true,
         reminders: true,
+        note: { select: { id: true, updatedAt: true } },
         project: { select: { id: true, name: true, color: true } },
         section: true,
         parent: { select: { id: true, title: true, status: true } },
@@ -463,41 +472,58 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const data = createTaskSchema.parse(req.body);
 
     const isSubtaskCreate = Boolean(data.parentId);
-    const task = await prisma.task.create({
-      data: {
-        title: data.title,
-        description: isSubtaskCreate ? null : data.description,
-        priority: isSubtaskCreate ? 'NONE' : (data.priority || 'NONE'),
-        dueDate: isSubtaskCreate ? null : (data.dueDate ? new Date(data.dueDate) : null),
-        startDate: isSubtaskCreate ? null : (data.startDate ? new Date(data.startDate) : null),
-        projectId: data.projectId,
-        sectionId: isSubtaskCreate ? null : data.sectionId,
-        parentId: data.parentId,
-        isAllDay: isSubtaskCreate ? true : (data.isAllDay ?? true),
-        status: data.status || 'TODO',
-        recurrenceType: isSubtaskCreate ? 'NONE' : (data.recurrenceType || 'NONE'),
-        recurrenceRule: isSubtaskCreate ? null : data.recurrenceRule,
-        creatorId: req.userId!,
-        tags: data.tagIds
-          ? { create: data.tagIds.map((tagId) => ({ tagId })) }
-          : undefined,
-        checklist: data.checklist
-          ? {
-              create: data.checklist.map((item, index) => ({
-                title: item.title,
-                isCompleted: item.isCompleted || false,
-                sortOrder: index,
-              })),
-            }
-          : undefined,
-      },
-      include: {
-        tags: { include: { tag: true } },
-        checklist: true,
-        children: true,
-        project: { select: { id: true, name: true, color: true } },
-        _count: { select: { children: true } },
-      },
+    if (data.noteContent && isSubtaskCreate) {
+      throw new AppError(400, 'Заметка доступна только для обычной задачи');
+    }
+    // Задача + заметка создаются одной транзакцией: неконсистентное
+    // состояние (задача без заметки при ошибке) невозможно.
+    const task = await prisma.$transaction(async (tx) => {
+      const created = await tx.task.create({
+        data: {
+          title: data.title,
+          description: isSubtaskCreate ? null : data.description,
+          priority: isSubtaskCreate ? 'NONE' : (data.priority || 'NONE'),
+          dueDate: isSubtaskCreate ? null : (data.dueDate ? new Date(data.dueDate) : null),
+          startDate: isSubtaskCreate ? null : (data.startDate ? new Date(data.startDate) : null),
+          projectId: data.projectId,
+          sectionId: isSubtaskCreate ? null : data.sectionId,
+          parentId: data.parentId,
+          isAllDay: isSubtaskCreate ? true : (data.isAllDay ?? true),
+          status: data.status || 'TODO',
+          recurrenceType: isSubtaskCreate ? 'NONE' : (data.recurrenceType || 'NONE'),
+          recurrenceRule: isSubtaskCreate ? null : data.recurrenceRule,
+          creatorId: req.userId!,
+          tags: data.tagIds
+            ? { create: data.tagIds.map((tagId) => ({ tagId })) }
+            : undefined,
+          checklist: data.checklist
+            ? {
+                create: data.checklist.map((item, index) => ({
+                  title: item.title,
+                  isCompleted: item.isCompleted || false,
+                  sortOrder: index,
+                })),
+              }
+            : undefined,
+        },
+        include: {
+          tags: { include: { tag: true } },
+          checklist: true,
+          children: true,
+          project: { select: { id: true, name: true, color: true } },
+          _count: { select: { children: true } },
+        },
+      });
+      if (data.noteContent) {
+        await tx.note.create({
+          data: {
+            userId: req.userId!,
+            taskId: created.id,
+            content: data.noteContent,
+          },
+        });
+      }
+      return created;
     });
 
     // Browser/server reminders relative to dueDate (with optional repeat series)

@@ -517,6 +517,36 @@ class ApiClient {
   systemStatus() {
     return this.request<{ maintenance: { enabled: boolean; message: string } }>('/auth/system/status');
   }
+
+  // --- Notes (одна задача = максимум одна заметка) ---
+  getNotes() {
+    return this.request<{
+      notes: { id: string; taskId: string; taskTitle: string; preview: string; updatedAt: string }[];
+    }>('/notes');
+  }
+
+  getNote(id: string) {
+    return this.request<{ note: any }>(`/notes/${id}`);
+  }
+
+  getNoteByTask(taskId: string) {
+    return this.request<{ note: any | null }>(`/notes/by-task/${taskId}`);
+  }
+
+  createNote(data: { taskId: string; content: string }) {
+    return this.request<{ note: any }>('/notes', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  updateNote(id: string, content: string) {
+    return this.request<{ note: any }>(`/notes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  deleteNote(id: string) {
+    return this.request<{ success: boolean }>(`/notes/${id}`, { method: 'DELETE' });
+  }
 }
 
 export const api = new ApiClient();

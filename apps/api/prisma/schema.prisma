@@ -82,6 +82,7 @@ model User {
   notifications Notification[]
   subscriptions Subscription[]
   transactions  Transaction[]
+  notes         Note[]
 
   @@map("users")
 }
@@ -167,6 +168,23 @@ model AdminLog {
   @@index([targetUserId, createdAt])
   @@index([action, createdAt])
   @@map("admin_logs")
+}
+
+// Большая текстовая заметка задачи. Одна задача — максимум одна заметка.
+// Удаление задачи каскадно удаляет заметку (orphan notes невозможны).
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  taskId    String   @unique
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@map("notes")
 }
 
 // Реестр ошибок приложения для Error Center (только 5xx, без секретов).
@@ -342,6 +360,7 @@ model Task {
   attachments Attachment[]
   reminders Reminder[]
   comments  Comment[]
+  note      Note?
 
   @@index([projectId])
   @@index([assigneeId])

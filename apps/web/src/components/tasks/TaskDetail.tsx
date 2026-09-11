@@ -17,6 +17,7 @@ import {
   Clock3,
   FolderKanban,
   ListChecks,
+  StickyNote,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTasksStore } from '@/stores/tasks';
@@ -27,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { cn, formatDate, priorityLabels } from '@/lib/utils';
 import { TAG_COLORS, TAG_ICONS, randomTagColor } from '@/lib/tags';
 import { TagIcon } from '@/components/tasks/TagIcon';
+import { useNotesStore } from '@/stores/notes';
 
 const PRIORITIES = [
   { value: 'NONE', label: 'Нет', color: 'bg-emerald-600' },
@@ -36,9 +38,10 @@ const PRIORITIES = [
 ];
 
 export function TaskDetail() {
-  const { selectedTaskId, setSelectedTask, updateTask, deleteTask, completeTask, createTask } =
+  const { selectedTaskId, setSelectedTask, updateTask, deleteTask, completeTask, createTask, setCurrentView } =
     useTasksStore();
   const { projects } = useProjectsStore();
+  const openForTask = useNotesStore((s) => s.openForTask);
 
   const [task, setTask] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -699,6 +702,29 @@ const handleDueDateChange = (value: string) => {
             </div>
           </div>
           </div>}
+
+          {!isSubtask && (
+          <div className="px-4 py-3 border-t">
+            <button
+              type="button"
+              onClick={() => {
+                if (!task) return;
+                openForTask(task.id, task.title || 'Без названия');
+                setCurrentView('notes');
+              }}
+              className="flex w-full items-center gap-3 rounded-xl border border-violet-500/40 bg-violet-500/10 px-3 py-3 text-left transition-colors hover:bg-violet-500/20"
+            >
+              <StickyNote className="h-5 w-5 shrink-0 text-violet-300" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">Заметка</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {task?.note ? 'Есть заметка — открыть и редактировать' : 'Добавить большую заметку к задаче'}
+                </span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </div>
+          )}
 
           {!isSubtask && <>
           {/* Checklist */}

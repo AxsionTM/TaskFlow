@@ -12,6 +12,7 @@ import {
   Trash2,
   User,
   X,
+  StickyNote,
 } from 'lucide-react';
 import { useTasksStore, type DisplayMode } from '@/stores/tasks';
 import { ThemePicker } from '@/components/ThemePicker';
@@ -26,6 +27,7 @@ const TILES: { id: string; label: string; icon: any; mode?: DisplayMode }[] = [
   { id: 'habits', label: 'Привычки', icon: Flame },
   { id: 'goals', label: 'Цели', icon: Target },
   { id: 'birthdays', label: 'Дни рождения', icon: Gift },
+  { id: 'notes', label: 'Заметки', icon: StickyNote },
   { id: 'trash', label: 'Корзина', icon: Trash2 },
   { id: 'profile', label: 'Профиль', icon: User },
 ];

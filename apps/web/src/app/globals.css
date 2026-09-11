@@ -1378,10 +1378,28 @@ body::before {
 }
 
 /* ===== TaskFlow mobile design system (reference mockup, phone only) ===== */
+/* Системный safe-механизм от перекрытия нижней навигацией:
+   --mobile-bottom-nav-height = реальная высота панели (кнопки 52px +
+   отступы + safe-area). Все прокручиваемые области и панели действий
+   получают нижний отступ от этой переменной, а не наугад. */
+:root {
+  --mobile-bottom-nav-height: 84px;
+}
 @media (max-width: 1023px) {
   /* ����� ��� ������ ���������, ����� ������� �� ������ ��� �� */
   .mobile-main {
-    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom));
+  }
+
+  /* Панель деталей задачи: полноэкранный шит на телефоне — контент
+     получает тот же safe-отступ, кнопки внизу всегда доступны. */
+  .task-detail-panel > .flex-1 {
+    padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom));
+  }
+
+  /* Панель заметок: тот же механизм. */
+  .tf-note-panel {
+    padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom));
   }
 
   /* --- Bottom navigation --- */

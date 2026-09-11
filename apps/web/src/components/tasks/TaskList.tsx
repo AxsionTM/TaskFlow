@@ -17,6 +17,7 @@ import { PulseView } from '@/components/views/PulseView';
 import { ProfileView } from '@/components/views/ProfileView';
 import { BirthdaysView } from '@/components/views/BirthdaysView';
 import { GraphView } from '@/components/views/GraphView';
+import { NotesView } from '@/components/views/NotesView';
 import { TodayDashboard } from '@/components/views/TodayDashboard';
 import { TomorrowView } from '@/components/views/TomorrowView';
 import { WeekView } from '@/components/views/WeekView';
@@ -95,7 +96,8 @@ export function TaskList() {
       currentView !== 'agenda' &&
       currentView !== 'pulse' &&
       currentView !== 'profile' &&
-      currentView !== 'graph'
+      currentView !== 'graph' &&
+      currentView !== 'notes'
     ) {
       refreshCurrentView();
     }
@@ -134,6 +136,7 @@ export function TaskList() {
   if (currentView === 'birthdays') return <BirthdaysView />;
   if (currentView === 'graph') return <GraphView />;
   if (currentView === 'calendar') return <CalendarView />;
+  if (currentView === 'notes') return <NotesView />;
   if (currentView === 'overdue' && displayMode === 'list') return <OverdueView />;
   if (currentView === 'inbox' && displayMode === 'list') return <InboxView />;
 

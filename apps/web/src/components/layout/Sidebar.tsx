@@ -22,6 +22,7 @@ import {
   AlarmClock,
   Flame,
   Gift,
+  StickyNote,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
 import { useProjectsStore } from '@/stores/projects';
@@ -340,6 +341,18 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               active={currentView === 'focus'}
               onClick={() => handleViewClick('focus')}
             />
+            <button
+              onClick={() => handleViewClick('notes')}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                currentView === 'notes'
+                  ? 'tf-nav-active'
+                  : 'text-foreground hover:bg-accent'
+              )}
+            >
+              <StickyNote className="h-4 w-4" />
+              Заметки
+            </button>
             <button
               onClick={() => handleViewClick('birthdays')}
               className={cn(

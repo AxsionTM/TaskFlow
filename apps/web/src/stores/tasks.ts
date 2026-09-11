@@ -116,7 +116,7 @@ const MODE_KEY = 'tf-display-mode';
 const KNOWN_VIEWS = new Set([
   'today', 'tomorrow', 'agenda', 'week', 'overdue', 'inbox', 'project',
   'habits', 'goals', 'focus', 'birthdays', 'graph', 'pulse', 'trash',
-  'profile', 'calendar',
+  'profile', 'calendar', 'notes',
 ]);
 
 function loadStoredView(): string {
