@@ -7,10 +7,10 @@ import { AuthRequest } from '../../common/middleware/auth';
 const router = Router();
 
 const createProjectSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  color: z.string().optional(),
-  icon: z.string().optional(),
+  name: z.string().min(1).max(200),
+  description: z.string().max(5000).optional(),
+  color: z.string().max(32).optional(),
+  icon: z.string().max(64).optional(),
 });
 
 router.get('/', async (req: AuthRequest, res, next) => {

@@ -21,10 +21,13 @@ router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const data = z
       .object({
-        name: z.string().min(1),
-        filter: z.record(z.any()),
-        icon: z.string().optional(),
-        color: z.string().optional(),
+        name: z.string().min(1).max(100),
+        filter: z.record(z.any()).refine(
+          (f) => JSON.stringify(f).length <= 10000,
+          'Фильтр слишком большой'
+        ),
+        icon: z.string().max(64).optional(),
+        color: z.string().max(32).optional(),
       })
       .parse(req.body);
 

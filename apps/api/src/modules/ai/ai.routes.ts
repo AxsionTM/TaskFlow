@@ -106,14 +106,22 @@ async function callAi(path: string, body: unknown): Promise<any | null> {
   }
 }
 
+const aiTextSchema = z.object({
+  title: z.string().min(1).max(2000),
+  description: z.string().max(10000).optional(),
+});
+
+const aiTaskItemSchema = z
+  .object({
+    id: z.string().max(64).optional(),
+    title: z.string().max(500).optional(),
+    description: z.string().max(2000).optional(),
+  })
+  .catchall(z.unknown());
+
 router.post('/breakdown', async (req: AuthRequest, res, next) => {
   try {
-    const data = z
-      .object({
-        title: z.string().min(1),
-        description: z.string().optional(),
-      })
-      .parse(req.body);
+    const data = aiTextSchema.parse(req.body);
 
     await assertAiEnabled();
     const remote = await callAi('/ai/breakdown', data);
@@ -126,12 +134,7 @@ router.post('/breakdown', async (req: AuthRequest, res, next) => {
 
 router.post('/priority', async (req: AuthRequest, res, next) => {
   try {
-    const data = z
-      .object({
-        title: z.string().min(1),
-        description: z.string().optional(),
-      })
-      .parse(req.body);
+    const data = aiTextSchema.parse(req.body);
 
     await assertAiEnabled();
     const remote = await callAi('/ai/priority', data);
@@ -146,8 +149,8 @@ router.post('/day-plan', async (req: AuthRequest, res, next) => {
   try {
     const data = z
       .object({
-        tasks: z.array(z.record(z.any())),
-        available_hours: z.number().optional(),
+        tasks: z.array(aiTaskItemSchema).max(200),
+        available_hours: z.number().min(0.5).max(24).optional(),
       })
       .parse(req.body);
 
@@ -164,7 +167,15 @@ router.post('/day-plan', async (req: AuthRequest, res, next) => {
 router.post('/productivity', async (req: AuthRequest, res, next) => {
   try {
     await assertAiEnabled();
-    const remote = await callAi('/ai/productivity', req.body || {});
+    // Сырой body наружу не отправляем: только известные поля с лимитами.
+    const data = z
+      .object({
+        tasks: z.array(aiTaskItemSchema).max(200).optional(),
+        days: z.number().int().min(1).max(90).optional(),
+      })
+      .strict()
+      .parse(req.body || {});
+    const remote = await callAi('/ai/productivity', data);
     res.json(
       remote || {
         score: 75,

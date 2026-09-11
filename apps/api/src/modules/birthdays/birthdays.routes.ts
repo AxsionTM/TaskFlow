@@ -20,9 +20,9 @@ function parseDateOnly(value: string): Date {
 }
 
 const bodySchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).max(100),
   date: z.string(),
-  note: z.string().optional().nullable(),
+  note: z.string().max(2000).optional().nullable(),
   remindDays: z.number().int().min(0).max(30).optional(),
 });
 

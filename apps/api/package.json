@@ -7,13 +7,14 @@
     "build": "tsc",
     "test:admin": "tsx scripts/e2e-admin.mjs",
     "test:notes": "tsx scripts/e2e-notes.mjs",
+    "test:security": "tsx scripts/e2e-security.mjs",
     "start": "node dist/main.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma db push",
     "prisma:studio": "prisma studio",
     "prisma:push": "prisma db push",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && prisma db push --accept-data-loss"
+    "vercel-build": "prisma generate && prisma db push"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -25,11 +26,9 @@
     "helmet": "^8.0.0",
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^6.9.16",
-    "minio": "^8.0.1",
     "multer": "^1.4.5-lts.1",
+    "nodemailer": "^10.0.8",
     "socket.io": "^4.8.0",
-    "uuid": "^10.0.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -39,9 +38,9 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.7.5",
-    "@types/nodemailer": "^6.4.17",
-    "@types/uuid": "^10.0.0",
+    "@types/nodemailer": "^8.0.1",
     "prisma": "^5.22.0",
+    "socket.io-client": "^4.8.3",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3"
   }

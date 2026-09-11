@@ -1,10 +1,36 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { prisma } from '../../common/utils/prisma';
+import { AppError } from '../../common/middleware/error-handler';
 import { AuthRequest } from '../../common/middleware/auth';
+import { importLimiter } from '../../common/middleware/rate-limits';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+// Лимиты импорта: stored-only ZIP (без распаковки — zip-bomb невозможен
+// через декомпрессию), плюс жёсткие крышки на количество и размеры.
+const MAX_IMPORT_ENTRIES = 2000;
+const MAX_ENTRY_BYTES = 1 * 1024 * 1024;
+const MAX_IMPORTED_TASKS = 2000;
+const MAX_IMPORT_TITLE = 500;
+const MAX_IMPORT_DESC = 10000;
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const name = (file.originalname || '').toLowerCase();
+    if (name.endsWith('.zip') || name.endsWith('.md')) cb(null, true);
+    else cb(new AppError(400, 'Разрешены только .zip и .md файлы'));
+  },
+});
+
+function parseImportDate(value: string | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
 
 
 function crc32(input: Buffer) {
@@ -84,23 +110,28 @@ router.get('/obsidian', async (req: AuthRequest, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/obsidian/import', upload.single('file'), async (req: AuthRequest, res, next) => {
+router.post('/obsidian/import', importLimiter, upload.single('file'), async (req: AuthRequest, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'Файл не найден' });
-    const entries = req.file.originalname.toLowerCase().endsWith('.md')
+    const rawEntries = req.file.originalname.toLowerCase().endsWith('.md')
       ? [{ name: req.file.originalname, data: req.file.buffer }]
       : readStoredZip(req.file.buffer);
+    if (rawEntries.length > MAX_IMPORT_ENTRIES) {
+      throw new AppError(400, `Слишком много файлов в архиве (максимум ${MAX_IMPORT_ENTRIES})`);
+    }
+    const entries = rawEntries.slice(0, MAX_IMPORT_ENTRIES).filter((e) => e.data.length <= MAX_ENTRY_BYTES);
     const markdown = entries.filter((e) => e.name.toLowerCase().endsWith('.md') && !e.name.endsWith('README.md'));
     const records: Array<{ name: string; title: string; description: string | null; meta: Record<string,string> }> = [];
-    for (const entry of markdown) {
-      const text = entry.data.toString('utf8');
+    for (const entry of markdown.slice(0, MAX_IMPORTED_TASKS)) {
+      const text = entry.data.toString('utf8', 0, Math.min(entry.data.length, MAX_ENTRY_BYTES));
       const titleMatch = text.match(/^#\s+(.+)$/m); if (!titleMatch) continue;
-      const title = titleMatch[1].trim();
-      const front = text.match(/^---\n([\s\S]*?)\n---/);
+      const title = titleMatch[1].trim().slice(0, MAX_IMPORT_TITLE);
+      if (!title) continue;
+      const front = text.match(/^---\n([\s\S]{0,4000}?)\n---/);
       const meta: Record<string,string> = {};
-      for (const line of (front?.[1] || '').split('\n')) { const m = line.match(/^([A-Za-z][\w-]*):\s*(.+)$/); if (m) meta[m[1]] = m[2].trim(); }
-      const description = text.replace(/^---[\s\S]*?---\n?/, '').replace(/^#\s+.+\n?/, '').trim() || null;
-      records.push({ name: entry.name, title, description, meta });
+      for (const line of (front?.[1] || '').split('\n').slice(0, 40)) { const m = line.match(/^([A-Za-z][\w-]*):\s*(.{1,500})$/); if (m) meta[m[1]] = m[2].trim(); }
+      const description = (text.replace(/^---[\s\S]*?---\n?/, '').replace(/^#\s+.+\n?/, '').trim() || null)?.slice(0, MAX_IMPORT_DESC) || null;
+      records.push({ name: entry.name.slice(0, 200), title, description, meta });
     }
 
     const idMap = new Map<string, string>();
@@ -122,14 +153,15 @@ router.post('/obsidian/import', upload.single('file'), async (req: AuthRequest, 
           await prisma.task.update({ where: { id: existing.id }, data: { title: record.title, description: record.description } });
           idMap.set(record.meta.taskId!, existing.id);
         } else {
+          if (imported >= MAX_IMPORTED_TASKS) break;
           const created = await prisma.task.create({
             data: {
               creatorId: req.userId!, title: record.title, description: record.description,
               parentId: oldParent ? (idMap.get(oldParent) || null) : null,
               priority: ['HIGH','MEDIUM','LOW'].includes(record.meta.priority) ? record.meta.priority as any : 'NONE',
               status: record.meta.status === 'COMPLETED' ? 'COMPLETED' : 'TODO', isAllDay: true,
-              startDate: record.meta.startDate ? new Date(record.meta.startDate) : null,
-              dueDate: record.meta.dueDate ? new Date(record.meta.dueDate) : null,
+              startDate: parseImportDate(record.meta.startDate),
+              dueDate: parseImportDate(record.meta.dueDate),
             },
           });
           if (record.meta.taskId) idMap.set(record.meta.taskId, created.id);
@@ -140,6 +172,7 @@ router.post('/obsidian/import', upload.single('file'), async (req: AuthRequest, 
     }
     // If a malformed parent reference exists, import it as a root rather than losing the task.
     for (const record of pending) {
+      if (imported >= MAX_IMPORTED_TASKS) break;
       await prisma.task.create({ data: { creatorId: req.userId!, title: record.title, description: record.description, priority: 'NONE', status: 'TODO', isAllDay: true } });
       imported++;
     }

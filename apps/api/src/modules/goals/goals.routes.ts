@@ -25,13 +25,13 @@ router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const data = z
       .object({
-        name: z.string().min(1),
-        description: z.string().optional(),
-        targetValue: z.number().optional(),
-        currentValue: z.number().optional(),
-        unit: z.string().optional(),
+        name: z.string().min(1).max(200),
+        description: z.string().max(10000).optional(),
+        targetValue: z.number().finite().min(-1e12).max(1e12).optional(),
+        currentValue: z.number().finite().min(-1e12).max(1e12).optional(),
+        unit: z.string().max(32).optional(),
         deadline: z.string().datetime().optional().nullable(),
-        color: z.string().optional(),
+        color: z.string().max(32).optional(),
       })
       .parse(req.body);
 
@@ -58,13 +58,13 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
   try {
     const data = z
       .object({
-        name: z.string().min(1).optional(),
-        description: z.string().optional().nullable(),
-        targetValue: z.number().optional().nullable(),
-        currentValue: z.number().optional(),
-        unit: z.string().optional().nullable(),
+        name: z.string().min(1).max(200).optional(),
+        description: z.string().max(10000).optional().nullable(),
+        targetValue: z.number().finite().min(-1e12).max(1e12).optional().nullable(),
+        currentValue: z.number().finite().min(-1e12).max(1e12).optional(),
+        unit: z.string().max(32).optional().nullable(),
         deadline: z.string().datetime().optional().nullable(),
-        color: z.string().optional(),
+        color: z.string().max(32).optional(),
         isCompleted: z.boolean().optional(),
       })
       .parse(req.body);

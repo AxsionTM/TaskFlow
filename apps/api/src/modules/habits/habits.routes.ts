@@ -8,7 +8,7 @@ const router = Router();
 
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
-    const days = Number(req.query.days) || 60;
+    const days = Math.min(Math.max(Number(req.query.days) || 60, 1), 365);
     const since = new Date();
     since.setDate(since.getDate() - days);
     since.setHours(0, 0, 0, 0);
@@ -71,14 +71,14 @@ router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const data = z
       .object({
-        name: z.string().min(1),
-        description: z.string().optional(),
-        color: z.string().optional(),
-        icon: z.string().optional(),
+        name: z.string().min(1).max(200),
+        description: z.string().max(5000).optional(),
+        color: z.string().max(32).optional(),
+        icon: z.string().max(64).optional(),
         frequency: z.enum(['DAILY', 'WEEKLY', 'CUSTOM']).optional(),
-        targetDays: z.array(z.number()).optional(),
-        targetCount: z.number().optional(),
-        reminderTime: z.string().optional(),
+        targetDays: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+        targetCount: z.number().int().min(1).max(1000).optional(),
+        reminderTime: z.string().max(16).optional(),
       })
       .parse(req.body);
 
@@ -106,13 +106,13 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
   try {
     const data = z
       .object({
-        name: z.string().min(1).optional(),
-        description: z.string().optional().nullable(),
-        color: z.string().optional(),
+        name: z.string().min(1).max(200).optional(),
+        description: z.string().max(5000).optional().nullable(),
+        color: z.string().max(32).optional(),
         frequency: z.enum(['DAILY', 'WEEKLY', 'CUSTOM']).optional(),
-        targetDays: z.array(z.number()).optional(),
-        targetCount: z.number().optional(),
-        reminderTime: z.string().optional().nullable(),
+        targetDays: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+        targetCount: z.number().int().min(1).max(1000).optional(),
+        reminderTime: z.string().max(16).optional().nullable(),
         isArchived: z.boolean().optional(),
       })
       .parse(req.body);
@@ -155,9 +155,9 @@ router.post('/:id/log', async (req: AuthRequest, res, next) => {
   try {
     const { date, count, note } = z
       .object({
-        date: z.string().optional(),
-        count: z.number().optional(),
-        note: z.string().optional(),
+        date: z.string().max(64).optional(),
+        count: z.number().int().min(0).max(100000).optional(),
+        note: z.string().max(2000).optional(),
       })
       .parse(req.body);
 

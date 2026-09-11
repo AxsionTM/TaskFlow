@@ -22,12 +22,12 @@ router.post('/sessions', async (req: AuthRequest, res, next) => {
   try {
     const data = z
       .object({
-        taskId: z.string().optional().nullable(),
-        durationMin: z.number().min(0.1),
-        type: z.string().optional(),
+        taskId: z.string().max(64).optional().nullable(),
+        durationMin: z.number().int().min(1).max(1440),
+        type: z.string().max(32).optional(),
         startedAt: z.string().datetime(),
         endedAt: z.string().datetime().optional().nullable(),
-        notes: z.string().optional(),
+        notes: z.string().max(2000).optional(),
       })
       .parse(req.body);
 

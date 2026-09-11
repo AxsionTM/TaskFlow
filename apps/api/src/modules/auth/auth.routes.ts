@@ -1,14 +1,15 @@
 import 'dotenv/config';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { prisma } from '../../common/utils/prisma';
 import { AppError } from '../../common/middleware/error-handler';
 import { authMiddleware, AuthRequest } from '../../common/middleware/auth';
-import { sendVerificationCode } from '../../common/utils/mailer';
+import { sendVerificationCode, isEmailConfigured } from '../../common/utils/mailer';
 import { issueCode, consumeCode, invalidateCodes } from '../../common/utils/verification';
+import { loginLimiter, registerLimiter } from '../../common/middleware/rate-limits';
+import { signToken, verifyToken } from '../../common/utils/jwt';
 
 const router = Router();
 
@@ -50,11 +51,7 @@ function parseDateOnly(value: string): Date {
 }
 
 function generateToken(userId: string): string {
-  return jwt.sign(
-    { userId },
-    process.env.JWT_SECRET || 'fallback-secret',
-    { expiresIn: '30d' }
-  );
+  return signToken({ userId }, '30d');
 }
 
 async function ensureInbox(userId: string) {
@@ -151,12 +148,18 @@ router.get('/providers', (_req, res) => {
   });
 });
 
-router.post('/register', async (req, res, next) => {
+router.post('/register', registerLimiter, async (req, res, next) => {
   try {
     const data = registerSchema.parse(req.body);
 
     if (data.password !== data.confirmPassword) {
       throw new AppError(400, 'Пароли не совпадают');
+    }
+
+    // В production без настроенного SMTP регистрация бессмысленна
+    // (код подтверждения не дойдёт) — отказываем сразу, до создания пользователя.
+    if (process.env.NODE_ENV === 'production' && !isEmailConfigured()) {
+      throw new AppError(503, 'Регистрация временно недоступна. Попробуйте позже.');
     }
 
     const existing = await prisma.user.findUnique({
@@ -322,11 +325,7 @@ router.post('/forgot-password', codeLimiter, async (req, res, next) => {
 });
 
 function generateResetToken(userId: string, version: number): string {
-  return jwt.sign(
-    { userId, purpose: 'password-reset', v: version },
-    process.env.JWT_SECRET || 'fallback-secret',
-    { expiresIn: '15m' }
-  );
+  return signToken({ userId, purpose: 'password-reset', v: version }, '15m');
 }
 
 router.post('/verify-reset-code', codeLimiter, async (req, res, next) => {
@@ -370,10 +369,7 @@ router.post('/reset-password', codeLimiter, async (req, res, next) => {
 
     let payload: { userId: string; purpose?: string; v?: number };
     try {
-      payload = jwt.verify(
-        data.resetToken,
-        process.env.JWT_SECRET || 'fallback-secret'
-      ) as { userId: string; purpose?: string; v?: number };
+      payload = verifyToken(data.resetToken);
     } catch {
       throw new AppError(400, 'Ссылка восстановления недействительна или истекла. Запросите новый код.', 'RESET_EXPIRED');
     }
@@ -417,7 +413,7 @@ router.post('/reset-password', codeLimiter, async (req, res, next) => {
   }
 });
 
-router.post('/login', async (req, res, next) => {
+router.post('/login', loginLimiter, async (req, res, next) => {
   try {
     const data = loginSchema.parse(req.body);
 

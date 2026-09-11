@@ -44,8 +44,8 @@ router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const data = z
       .object({
-        name: z.string().min(1),
-        color: z.string().optional(),
+        name: z.string().min(1).max(60),
+        color: z.string().max(32).optional(),
         icon: z.string().max(32).optional().nullable(),
       })
       .parse(req.body);

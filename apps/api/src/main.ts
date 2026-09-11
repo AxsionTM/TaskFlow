@@ -22,8 +22,26 @@ import { notesRouter } from "./modules/notes/notes.routes";
 import { adminRouter } from "./modules/admin/admin.routes";
 import { errorHandler } from "./common/middleware/error-handler";
 import { authMiddleware } from "./common/middleware/auth";
+import {
+  writeLimiter,
+  aiLimiter,
+  exportLimiter,
+  adminLimiter,
+} from "./common/middleware/rate-limits";
 
 dotenv.config();
+
+// Fail-fast для production: без настоящего JWT_SECRET приложение
+// не запускается (никаких fallback-секретов в проде).
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('FATAL: JWT_SECRET is not set. Refusing to start in production.');
+}
+if (!process.env.JWT_SECRET) {
+  console.warn('WARNING: JWT_SECRET is not set, using insecure development fallback. Never use this in production.');
+}
+if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+  throw new Error('FATAL: DATABASE_URL is not set. Refusing to start in production.');
+}
 
 const app = express();
 
@@ -100,15 +118,27 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 3001;
 
-app.use(helmet());
+app.use(
+  helmet({
+    // API отдаёт только JSON/редиректы, HTML нет — строгий CSP безопасен.
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'none'"],
+        formAction: ["'self'"],
+      },
+    },
+  })
+);
 
 app.use(cors(corsOptions));
 
 // Явно обрабатываем CORS preflight OPTIONS-запросы.
 app.options("*", cors(corsOptions));
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -128,31 +158,70 @@ app.get("/health", (_req, res) => {
 
 app.use("/auth", authRouter);
 
-app.use("/tasks", authMiddleware, tasksRouter);
-app.use("/projects", authMiddleware, projectsRouter);
-app.use("/tags", authMiddleware, tagsRouter);
-app.use("/habits", authMiddleware, habitsRouter);
-app.use("/goals", authMiddleware, goalsRouter);
-app.use("/focus", authMiddleware, focusRouter);
-app.use("/smart-lists", authMiddleware, smartListsRouter);
-app.use("/ai", authMiddleware, aiRouter);
-app.use("/export", authMiddleware, exportRouter);
-app.use("/birthdays", authMiddleware, birthdaysRouter);
+app.use("/tasks", authMiddleware, writeLimiter, tasksRouter);
+app.use("/projects", authMiddleware, writeLimiter, projectsRouter);
+app.use("/tags", authMiddleware, writeLimiter, tagsRouter);
+app.use("/habits", authMiddleware, writeLimiter, habitsRouter);
+app.use("/goals", authMiddleware, writeLimiter, goalsRouter);
+app.use("/focus", authMiddleware, writeLimiter, focusRouter);
+app.use("/smart-lists", authMiddleware, writeLimiter, smartListsRouter);
+app.use("/ai", authMiddleware, aiLimiter, aiRouter);
+app.use("/export", authMiddleware, exportLimiter, exportRouter);
+app.use("/birthdays", authMiddleware, writeLimiter, birthdaysRouter);
 app.use("/graph", authMiddleware, graphRouter);
-app.use("/notes", authMiddleware, notesRouter);
-app.use("/admin", adminRouter);
+app.use("/notes", authMiddleware, writeLimiter, notesRouter);
+app.use("/admin", adminLimiter, adminRouter);
 
 app.use(errorHandler);
 
+io.use(async (socket, next) => {
+  try {
+    const token =
+      (socket.handshake.auth?.token as string | undefined) ||
+      (typeof socket.handshake.headers.authorization === "string"
+        ? socket.handshake.headers.authorization.replace(/^Bearer /, "")
+        : undefined);
+    if (!token) return next(new Error("Unauthorized"));
+
+    const { verifyToken } = await import("./common/utils/jwt");
+    const { prisma } = await import("./common/utils/prisma");
+    const payload = verifyToken(token);
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, isBlocked: true },
+    });
+    if (!user || user.isBlocked) return next(new Error("Unauthorized"));
+
+    socket.data.userId = user.id;
+    next();
+  } catch {
+    next(new Error("Unauthorized"));
+  }
+});
+
 io.on("connection", (socket) => {
   console.log(`Client connected: ${socket.id}`);
+  const ownId = socket.data.userId as string;
 
   socket.on("join:user", (userId: string) => {
-    socket.join(`user:${userId}`);
+    // Только своя комната — чужие ID отклоняются.
+    if (typeof userId !== "string" || userId !== ownId) return;
+    socket.join(`user:${ownId}`);
   });
 
-  socket.on("join:project", (projectId: string) => {
-    socket.join(`project:${projectId}`);
+  socket.on("join:project", async (projectId: string) => {
+    try {
+      if (typeof projectId !== "string" || projectId.length > 64) return;
+      const { prisma } = await import("./common/utils/prisma");
+      const membership = await prisma.projectMember.findFirst({
+        where: { projectId, userId: ownId },
+      });
+      // Без membership комнату не выдаём (проверка ДО join).
+      if (!membership) return;
+      socket.join(`project:${projectId}`);
+    } catch {
+      // ignore
+    }
   });
 
   socket.on("disconnect", () => {

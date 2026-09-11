@@ -7,8 +7,8 @@ import { AuthRequest } from '../../common/middleware/auth';
 const router = Router();
 
 const createTaskSchema = z.object({
-  title: z.string().min(1, 'Название обязательно'),
-  description: z.string().optional().nullable(),
+  title: z.string().min(1, 'Название обязательно').max(500),
+  description: z.string().max(10000).optional().nullable(),
   priority: z.enum(['NONE', 'LOW', 'MEDIUM', 'HIGH']).optional(),
   dueDate: z.string().optional().nullable(),
   startDate: z.string().optional().nullable(),
@@ -29,9 +29,10 @@ const createTaskSchema = z.object({
     .refine((s) => s.trim().length > 0, 'Заметка не может быть пустой')
     .optional()
     .nullable(),
-  tagIds: z.array(z.string()).optional(),
+  tagIds: z.array(z.string().max(64)).max(50).optional(),
   checklist: z
-    .array(z.object({ title: z.string(), isCompleted: z.boolean().optional() }))
+    .array(z.object({ title: z.string().min(1).max(500), isCompleted: z.boolean().optional() }))
+    .max(100)
     .optional(),
 });
 

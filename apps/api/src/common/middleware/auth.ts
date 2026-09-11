@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma';
+import { verifyToken } from '../utils/jwt';
 import { AppError } from './error-handler';
 
 export interface AuthRequest extends Request {
@@ -49,10 +49,7 @@ export async function authMiddleware(
   const token = header.slice(7);
 
   try {
-    const payload = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'fallback-secret'
-    ) as { userId: string; iat?: number };
+    const payload = verifyToken(token);
 
     // Проверяем существование, роль и блокировку на каждый запрос:
     // заблокированный пользователь мгновенно теряет доступ к API,
