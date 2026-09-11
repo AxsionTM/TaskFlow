@@ -288,8 +288,10 @@ export function NotesView() {
               clearPendingTask();
             }}
             onSaved={(note) => {
+              // После сохранения — всегда назад в общее меню заметок,
+              // а не зависший экран редактирования.
               upsertPreview(note);
-              setSelectedNote(note.id);
+              setSelectedNote(null);
               clearPendingTask();
             }}
             onDeleted={(id) => {

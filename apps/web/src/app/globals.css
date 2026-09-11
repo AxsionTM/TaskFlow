@@ -1391,16 +1391,14 @@ body::before {
     padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom));
   }
 
-  /* Панель деталей задачи: полноэкранный шит на телефоне — контент
-     получает тот же safe-отступ, кнопки внизу всегда доступны. */
+  /* Панель деталей задачи: fixed-шит на весь viewport (вне отступа main),
+     поэтому ей нужен собственный safe-отступ — кнопки внизу доступны. */
   .task-detail-panel > .flex-1 {
     padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom));
   }
 
-  /* Панель заметок: тот же механизм. */
-  .tf-note-panel {
-    padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom));
-  }
+  /* Панель заметок в потоке main: отступ уже даёт .mobile-main,
+     собственный не нужен (иначе двойная пустая зона под футером). */
 
   /* --- Bottom navigation --- */
   .mobile-bottom-nav {
