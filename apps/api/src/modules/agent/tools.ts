@@ -43,6 +43,8 @@ function serializeTask(t: any, tz: string) {
     title: t.title,
     status: t.status,
     priority: t.priority,
+    start: t.startDate || null,
+    startLabel: t.startDate ? formatInTz(t.startDate, tz) : null,
     due: t.dueDate,
     dueLabel: formatInTz(t.dueDate, tz),
     project: t.project ? { id: t.project.id, name: t.project.name } : null,
@@ -234,14 +236,15 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'create_task',
-    description: 'Создать задачу. Дату передавать ISO (parse_natural_date делает вызывающий код).',
+    description: 'Создать задачу. Даты передавать ISO. startDateISO — начало диапазона, dueDateISO — конец/срок.',
     parameters: {
       type: 'object',
       properties: {
         title: { type: 'string', minLength: 1, maxLength: 500 },
         description: str(10000, 'Описание'),
         priority: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'NONE'] },
-        dueDateISO: str(64, 'Срок ISO'),
+        startDateISO: str(64, 'Начало ISO'),
+        dueDateISO: str(64, 'Срок/конец ISO'),
         projectId: str(64, 'ID проекта'),
         tagNames: { type: 'array', items: { type: 'string', maxLength: 60 }, maxItems: 10 },
       },
@@ -262,8 +265,9 @@ export const TOOLS: ToolDef[] = [
           title: String(a.title).slice(0, 500),
           description: a.description ? String(a.description).slice(0, 10000) : undefined,
           priority: ['HIGH', 'MEDIUM', 'LOW'].includes(a.priority) ? a.priority : 'NONE',
+          startDate: a.startDateISO ? new Date(String(a.startDateISO)) : null,
           dueDate: a.dueDateISO ? new Date(String(a.dueDateISO)) : null,
-          isAllDay: !a.dueDateISO,
+          isAllDay: !a.dueDateISO && !a.startDateISO,
           projectId: a.projectId ? String(a.projectId) : undefined,
           status: 'TODO',
           creatorId: userId,
@@ -276,7 +280,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'update_task',
-    description: 'Изменить задачу: название, описание, приоритет, срок, проект, статус.',
+    description: 'Изменить ТОЛЬКО указанные поля задачи: название, описание, приоритет, начало, срок, проект, статус.',
     parameters: {
       type: 'object',
       properties: {
@@ -284,7 +288,8 @@ export const TOOLS: ToolDef[] = [
         title: str(500, 'Новое название'),
         description: { type: ['string', 'null'] },
         priority: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'NONE'] },
-        dueDateISO: str(64, 'Новый срок ISO'),
+        startDateISO: str(64, 'Новое начало ISO'),
+        dueDateISO: str(64, 'Новый срок/конец ISO'),
         clearDueDate: { type: 'boolean' },
         projectId: { type: ['string', 'null'] },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'COMPLETED'] },
@@ -297,6 +302,7 @@ export const TOOLS: ToolDef[] = [
       if (a.title !== undefined) patch.title = String(a.title).slice(0, 500);
       if (a.description !== undefined) patch.description = a.description === null ? null : String(a.description).slice(0, 10000);
       if (a.priority !== undefined) patch.priority = a.priority;
+      if (a.startDateISO !== undefined) patch.startDate = new Date(String(a.startDateISO));
       if (a.clearDueDate) patch.dueDate = null;
       else if (a.dueDateISO !== undefined) patch.dueDate = new Date(String(a.dueDateISO));
       if (a.projectId !== undefined) {

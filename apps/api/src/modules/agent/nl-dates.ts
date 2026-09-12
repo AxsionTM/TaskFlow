@@ -78,8 +78,32 @@ function daysInMonth(y: number, mo: number): number {
 
 export interface ParsedDateTime {
   iso: string;
+  /** Конец диапазона ("с 16 до 20"), если указан. */
+  endISO?: string;
   hasTime: boolean;
   label: string;
+}
+
+/** Слова-числа для часов: "с четырёх до восьми". */
+const WORD_NUMS: Record<string, number> = {
+  'час': 1, 'часа': 1, 'один': 1, 'одна': 1, 'одного': 1, 'одной': 1,
+  'два': 2, 'две': 2, 'двух': 2, 'три': 3, 'трех': 3, 'трёх': 3,
+  'четыре': 4, 'четырех': 4, 'четырёх': 4, 'пять': 5, 'пяти': 5,
+  'шесть': 6, 'шести': 6, 'семь': 7, 'семи': 7, 'восемь': 8, 'восьми': 8,
+  'девять': 9, 'девяти': 9, 'десять': 10, 'десяти': 10,
+  'одиннадцать': 11, 'одиннадцати': 11, 'двенадцать': 12, 'двенадцати': 12,
+  'тринадцать': 13, 'четырнадцать': 14, 'пятнадцать': 15, 'шестнадцать': 16,
+  'семнадцать': 17, 'восемнадцать': 18, 'девятнадцать': 19,
+  'двадцать': 20, 'двадцать один': 21, 'двадцать два': 22, 'двадцать три': 23,
+};
+
+function wordToHour(s: string): number | null {
+  const t = s.trim().toLowerCase().replace(/ё/g, 'е');
+  if (/^\d{1,2}$/.test(t)) {
+    const n = Number(t);
+    return n <= 23 ? n : null;
+  }
+  return WORD_NUMS[t] ?? null;
 }
 
 /**
@@ -164,9 +188,9 @@ export function parseRuDateTime(rawText: string, tz: string, now: Date = new Dat
   }
 
   if (!foundDay) {
-    // дни недели: "в понедельник", "к пятнице", "на следующей неделе"
+    // дни недели: "в понедельник", "на понедельник", "к пятнице"
     const nextWeek = /на следующей неделе/.test(text);
-    const wm = text.match(/(?:в|во|к|до)\s+([а-я]+)/);
+    const wm = text.match(/(?:в|во|к|до|на)\s+([а-я]+)/);
     const wd = wm ? RU_WEEKDAYS[wm[1]] : undefined;
     if (wd !== undefined) {
       let delta = (wd - cur.wd + 7) % 7;
@@ -187,34 +211,72 @@ export function parseRuDateTime(rawText: string, tz: string, now: Date = new Dat
 
   if (!foundDay) return null;
 
-  // Время: "в 16:00", "на 16:00", "в 16", "утром", "днём", "вечером"
+  // Диапазон: "с 16 до 20", "с 16:30 до 20:00", "с четырёх до восьми"
   let hh = 12;
   let mm = 0;
   let hasTime = false;
-  const tmMatch = text.match(/(?:в|к|на)\s+(\d{1,2})(?::(\d{2}))?/);
-  if (tmMatch) {
-    const h = Number(tmMatch[1]);
-    const m = tmMatch[2] !== undefined ? Number(tmMatch[2]) : 0;
-    if (h <= 23 && m <= 59) {
-      hh = h;
-      mm = m;
+  let endHH: number | null = null;
+  let endMM = 0;
+  const rangeM = text.match(/с\s+(\d{1,2}(?::\d{2})?|[а-я]+)\s*(?:часов?|ч\.?)?\s*до\s+(\d{1,2}(?::\d{2})?|[а-я]+)/);
+  if (rangeM) {
+    const parseHM = (s: string): [number, number] | null => {
+      const dm = s.match(/^(\d{1,2})(?::(\d{2}))?$/);
+      if (dm) {
+        const h = Number(dm[1]);
+        const m = dm[2] !== undefined ? Number(dm[2]) : 0;
+        return h <= 23 && m <= 59 ? [h, m] : null;
+      }
+      const w = wordToHour(s);
+      return w !== null ? [w, 0] : null;
+    };
+    const s = parseHM(rangeM[1]);
+    const e = parseHM(rangeM[2]);
+    if (s && e) {
+      hh = s[0];
+      mm = s[1];
+      endHH = e[0];
+      endMM = e[1];
       hasTime = true;
     }
-  } else if (/утром|утра/.test(text)) {
-    hh = 9;
-    mm = 0;
-    hasTime = true;
-  } else if (/днем|днём|обед/.test(text)) {
-    hh = 13;
-    mm = 0;
-    hasTime = true;
-  } else if (/вечером|вечера/.test(text)) {
-    hh = 19;
-    mm = 0;
-    hasTime = true;
+  }
+  // Время: "в 16:00", "на 16:00", "в 16", "утром", "днём", "вечером"
+  if (!hasTime) {
+    const tmMatch = text.match(/(?:в|к|на)\s+(\d{1,2})(?::(\d{2}))?/);
+    if (tmMatch) {
+      const h = Number(tmMatch[1]);
+      const m = tmMatch[2] !== undefined ? Number(tmMatch[2]) : 0;
+      if (h <= 23 && m <= 59) {
+        // "на 5 подзадач" — не время: требуется минуты или контекст времени
+        const isBareCount = tmMatch[2] === undefined && /на\s+\d+\s+(подзадач|задач|раз|проект)/.test(text);
+        if (!isBareCount) {
+          hh = h;
+          mm = m;
+          hasTime = true;
+        }
+      }
+    }
+  }
+  if (!hasTime) {
+    if (/утром|утра/.test(text)) {
+      hh = 9;
+      mm = 0;
+      hasTime = true;
+    } else if (/днем|днём|обед/.test(text)) {
+      hh = 13;
+      mm = 0;
+      hasTime = true;
+    } else if (/вечером|вечера/.test(text)) {
+      hh = 19;
+      mm = 0;
+      hasTime = true;
+    }
   }
 
-  return { iso: zonedToISO(zone, ty, tm, td, hh, mm), hasTime, label: label.trim() };
+  const result: ParsedDateTime = { iso: zonedToISO(zone, ty, tm, td, hh, mm), hasTime, label: label.trim() };
+  if (hasTime && endHH !== null) {
+    result.endISO = zonedToISO(zone, ty, tm, td, endHH, endMM);
+  }
+  return result;
 }
 
 /** Человекочитаемая дата ISO в timezone пользователя. */

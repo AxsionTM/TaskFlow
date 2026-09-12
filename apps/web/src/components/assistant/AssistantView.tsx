@@ -48,6 +48,9 @@ function priorityRu(p: string) {
 function TaskCard({ task }: { task: any }) {
   const done = task.subtasksDone ?? 0;
   const total = task.subtasksTotal ?? 0;
+  const timeRange = task.startLabel && task.due && task.start !== task.due
+    ? `${String(task.startLabel).split(',')[1]?.trim() || ''} — ${String(task.dueLabel).split(',')[1]?.trim() || ''}`
+    : null;
   return (
     <div className="mt-2 overflow-hidden rounded-2xl border border-primary/25 bg-card/60">
       <div className="border-b border-border/40 px-3.5 py-2.5">
@@ -60,8 +63,11 @@ function TaskCard({ task }: { task: any }) {
           <span className="text-muted-foreground">{task.dueLabel}</span>
           <span className="ml-auto text-muted-foreground">{task.status === 'COMPLETED' ? 'Завершена' : task.status === 'IN_PROGRESS' ? 'В работе' : 'К выполнению'}</span>
         </div>
+        {timeRange && timeRange.includes('—') && (
+          <div className="tabular-nums text-muted-foreground">{timeRange}</div>
+        )}
         {total > 0 && (
-          <div className="text-muted-foreground">Подзадачи {done} / {total}</div>
+          <div className="text-muted-foreground">Подзадачи: {done} / {total}</div>
         )}
       </div>
     </div>

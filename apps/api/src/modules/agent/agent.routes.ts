@@ -202,7 +202,8 @@ router.post('/chat', async (req: AuthRequest, res, next) => {
   try {
     const data = z
       .object({
-        conversationId: z.string().max(64).optional(),
+        // nullish: клиенты иногда шлют явный null для "нового чата"
+        conversationId: z.string().max(64).nullish(),
         message: z.string().min(1).max(4000),
         timezone: z.string().max(64).optional(),
         clientNowISO: z.string().datetime().optional(),
@@ -253,7 +254,7 @@ router.post('/chat', async (req: AuthRequest, res, next) => {
         reply = 'AI временно недоступен. Попробуй простую команду, например: «Что осталось на сегодня?»';
       }
     } else {
-      const out = await runRuleTurn(req.userId!, data.message, context, now);
+      const out = await runRuleTurn(req.userId!, data.message, context, now, histAsc);
       reply = out.reply;
       steps = out.steps;
       cards = out.cards;

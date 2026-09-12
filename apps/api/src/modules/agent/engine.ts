@@ -4,7 +4,7 @@
  * цифры берёт только из результатов tools.
  */
 import { TOOL_MAP } from './tools';
-import { parseRuDateTime, formatInTz, dayKeyInTz, zonedTomorrowNoon } from './nl-dates';
+import { parseRuDateTime, formatInTz, dayKeyInTz, zonedTomorrowNoon, zonedToISO } from './nl-dates';
 import { chatText, isLlmConfigured } from './llm';
 
 export interface AgentContext {
@@ -168,6 +168,156 @@ function stripVerbs(text: string): string {
   return t.replace(/\s+/g, ' ').trim();
 }
 
+/** Мусорные вводные обороты, не относящиеся к сути задачи. */
+const FILLER = [
+  'мне', 'тебе', 'нам', 'пожалуйста', 'давай', 'надо', 'нужно будет', 'нужно', 'надо будет',
+  'сесть и', 'сядь и', 'просто', 'немного', 'как следует', 'обязательно',
+];
+
+function stripFiller(s: string): string {
+  let t = ` ${s} `;
+  for (const f of FILLER) t = t.replace(new RegExp(`${L}${f}${R}`, 'g'), ' ');
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+function stripDateTimeProjectTags(s: string): string {
+  return s
+    .replace(/(завтра|послезавтра|сегодня|утром|вечером|днем|днём|с\s+\S+\s+до\s+\S+|в\s+\d{1,2}(?::\d{2})?|на\s+следующей\s+неделе|через\s+\d+\s+\S+|на\s+\d+\s+подзадач[а-я]*|в\s+понедельник|во\s+вторник|в\s+среду|в\s+четверг|в\s+пятницу|в\s+субботу|в\s+воскресенье|понедельник|вторник|сред[ау]|четверг|пятниц[ау]|суббот[ау]|воскресенье)(?![а-я])/gi, ' ')
+    .replace(/с\s+(высоким|средним|низким)\s+приоритетом(?![а-я])/gi, ' ')
+    .replace(/с\s+(высоким|средним|низким|обычным)(?![а-я])/gi, ' ')
+    .replace(/высокий\s+приоритет|средний\s+приоритет|низкий\s+приоритет/gi, ' ')
+    .replace(/в\s+проект[а-я]*\s+[а-яa-z0-9 _-]+/gi, ' ')
+    .replace(/с\s+тегом\s+[а-яa-z0-9_-]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Умное название: глагол-действие + объект.
+ * "мне завтра нужно будет сесть и доделать frontend" -> "Доделать frontend".
+ */
+function extractActionTitle(rawText: string): string {
+  const first = rawText.split(/[.!?\n]+/)[0] || '';
+  let t = stripFiller(norm(first));
+  t = stripVerbs(t);
+  t = stripDateTimeProjectTags(t);
+  t = stripFiller(t);
+  t = t.replace(/^[,:\-–—\s]+|[,:\-–—\s]+$/g, '').trim();
+  if (!t) return '';
+  // Обрезаем на границах клауз: двоеточие, "и + глагол", "на N подзадач".
+  // ("Подготовить встречу и сделай три подзадачи" -> "Подготовить встречу").
+  const clause = t.split(/:|\s+и\s+(?=[а-я]{2,})|\s+на\s+\d+\s+подзадач/i)[0];
+  // Инфинитив + объект (до 8 слов)
+  const m = clause.match(/((?:созвон|позвон|подготов|сдела|додела|исправ|провер|напиш|отправ|встрет|обсуд|заверш|нач|продолж|разработ|настро|подключ|провед|собр|заплан|организ|выполн|узна|назнач|добав|удали|купи|закажи|оплати|прочита|изучи|повтори|поздрав)[а-я]*)\s+((?:[а-яa-z0-9_«»"'-]+\s*){0,7}[а-яa-z0-9_«»"'-]+)/i);
+  if (m) {
+    return capitalize(m[0].trim().slice(0, 120));
+  }
+  return capitalize(clause.split(/\s+/).slice(0, 8).join(' ').slice(0, 120));
+}
+
+function capitalize(s: string): string {
+  const t = s.trim();
+  if (!t) return '';
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** Остаток после первого предложения — кандидат в описание (без дат/времени). */
+function extractDescription(rawText: string, titleUsed: string): string {
+  const parts = rawText.split(/[.!?\n]+/).map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 2) return '';
+  const rest = parts.slice(1).join('. ');
+  // Убираем перечисления подзадач из описания
+  const noLists = rest.replace(/(?:^|[.!?]\s*)(?:нужно|необходимо|надо)\s*:[^.!?]*[.!?]?/gi, ' ');
+  let d = stripDateTimeProjectTags(norm(noLists));
+  d = stripFiller(d);
+  // Убираем маркеры перечислений
+  d = d.replace(/(?:^|\s)(?:\d+[.)]|-|\*|сначала|потом|после этого|затем)\s+/gi, ' ');
+  return capitalize(d.replace(/\s+/g, ' ').trim().slice(0, 2000));
+}
+
+/**
+ * Пункты подзадач из явных перечислений:
+ * "1. ... 2. ...", маркеры, "сначала..., потом...", "нужно: a, b и c".
+ * Обычные предложения без маркеров НЕ делим (защита от бессмысленных сплитов).
+ */
+function extractSubtaskItems(rawText: string): string[] {
+  const items: string[] = [];
+  // Нумерованные / маркированные списки
+  for (const line of rawText.split('\n')) {
+    const m = line.trim().match(/^(?:\d+[.)\-:]|[-*•])\s*(.+)$/);
+    if (m && m[1].trim().length > 1) items.push(m[1].trim());
+  }
+  if (items.length >= 2) return normalizeItems(items).slice(0, 20);
+  // Явный список после "подзадачи: a, b, c"
+  const inlineM = rawText.match(/подзадач[а-я]*\s*:\s*(.+)$/i);
+  if (inlineM) {
+    const parts = inlineM[1].split(/[,;\n]+/).map((s) => s.trim()).filter((s) => s.length > 1);
+    if (parts.length >= 2) return normalizeItems(parts).slice(0, 20);
+  }
+  // Инлайн "1. xxx 2. yyy"
+  const inlineNum = [...rawText.matchAll(/(?:^|[\s;])(\d+)\.\s*([^;.\n]{3,150}?)(?=\s*\d+\.|$)/g)].map((m) => m[2].trim());
+  if (inlineNum.length >= 2) return normalizeItems(inlineNum).slice(0, 20);
+  // Последовательности "сначала..., потом..., затем..."
+  const seq = rawText.match(/сначала\s+([^.;\n]+?)(?:,?\s*(?:потом|после этого|затем|после|в конце)\s+([^.;\n]+))+[^.;\n]*/i);
+  if (seq) {
+    const parts = seq[0].split(/,?\s*(?:потом|после этого|затем|после|в конце)\s+/i).map((s) => s.replace(/^сначала\s+/i, '').trim()).filter((s) => s.length > 1);
+    if (parts.length >= 2) return normalizeItems(parts).slice(0, 20);
+  }
+  // "Нужно/необходимо: a, b и c" — перечисление через запятые.
+  // Чтобы не дробить обычные предложения (§8), требуем инфинитив в начале.
+  const needM = rawText.match(/(?:нужно|необходимо|надо)\s+([^.!?\n]{5,400})/i);
+  if (needM) {
+    // Делим по запятым и по "и + инфинитив": "имя, возраст и назначить встречу".
+    const parts = needM[1]
+      .split(/[,;]|\s+и\s+(?=[а-я]+(?:ать|ять|еть|ить|ти|чь|сти|овать|евать)(?![а-я]))/i)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 1);
+    const firstVerb = parts.length >= 2
+      ? (parts[0].match(/^([а-я]+(?:ать|ять|еть|ить|ти|чь|сти|овать|евать))(?![а-я])/i) || [])[1]
+      : null;
+    if (firstVerb) {
+      // Наследование глагола: "возраст" -> "Узнать возраст"
+      const fixed = parts.map((p, i) => {
+        if (i > 0 && !/^[а-я]+(?:ать|ять|еть|ить|ти|чь|сти|овать|евать)(?![а-я])/i.test(p)) {
+          return `${firstVerb} ${p.charAt(0).toLowerCase() + p.slice(1)}`;
+        }
+        return p;
+      });
+      return normalizeItems(fixed).slice(0, 20);
+    }
+  }
+  return [];
+}
+
+function normalizeItems(items: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of items) {
+    let t = raw.replace(/\s+/g, ' ').trim().replace(/[.!\s]+$/, '');
+    if (t.length < 2 || t.length > 200) continue;
+    // Глагол в начало: "его имя" после "узнать" уже обработано выше; чистим местоимения-хвосты
+    t = capitalize(t);
+    // Убираем вопросы-обрывки без смысла
+    if (/^(как|сколько|что|где|когда|почему|зачем)\b/i.test(t) && t.length < 40) {
+      // "как его зовут" -> "Узнать имя", "сколько ему лет" -> "Узнать возраст"
+      t = humanizeQuestion(t);
+    }
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+  }
+  return out;
+}
+
+function humanizeQuestion(q: string): string {
+  const t = q.toLowerCase();
+  if (/как.*зовут|имя/.test(t)) return 'Узнать имя';
+  if (/сколько.*лет|возраст/.test(t)) return 'Узнать возраст';
+  if (/встреч|созвон|позвон/.test(t)) return capitalize(t.replace(/\?/g, ''));
+  return capitalize(q);
+}
+
 function detectPriority(text: string): 'HIGH' | 'MEDIUM' | 'LOW' | null {
   const t = norm(text);
   if (/высок|срочн|важн|критич/.test(t)) return 'HIGH';
@@ -241,7 +391,8 @@ export async function runRuleTurn(
   userId: string,
   rawText: string,
   context: AgentContext,
-  now: Date = new Date()
+  now: Date = new Date(),
+  history: { role: string; content: string }[] = []
 ): Promise<TurnResult> {
   const steps: TurnStep[] = [];
   const cards: any[] = [];
@@ -279,24 +430,13 @@ export async function runRuleTurn(
     }
   }
 
-  // 1. Создание задачи (но не заметки — их разбирает §11)
+  // 1. Создание задачи (но не заметки — их разбирает §11).
+  // Сначала понимаем структуру, и только потом вызываем tools.
   if (!/заметк/.test(t) && (/^(создай|создать|добавь|добавить|новая задача|новую задачу|напомни|запланируй)(?![а-я])/.test(t) || (/задач[ау]\s+(на|с|к|о)(?![а-я])/.test(t) && /создай|добавь|нужна|нужно/.test(t)))) {
-    let title = extractQuoted(text) || '';
-    if (!title) {
-      title = stripVerbs(text)
-        .replace(/(завтра|послезавтра|сегодня|утром|вечером|днем|днём|в\s+\d{1,2}(?::\d{2})?|на\s+следующей\s+неделе|через\s+\d+\s+\S+|в\s+понедельник|во\s+вторник|в\s+среду|в\s+четверг|в\s+пятницу|в\s+субботу|в\s+воскресенье|понедельник|вторник|сред[ау]|четверг|пятниц[ау]|суббот[ау]|воскресенье)(?![а-я])/gi, ' ')
-        .replace(/с\s+(высоким|средним|низким)\s+приоритетом(?![а-я])/gi, ' ')
-        .replace(/в\s+проект[а-я]*\s+[а-яa-z0-9 _-]+/gi, ' ')
-        .replace(/с\s+тегом\s+[а-яa-z0-9_-]+/gi, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-    if (!title || title.length < 2) {
-      return fail('Как назвать задачу? Напиши, например: «Создай задачу Позвонить клиенту завтра в 15:00».');
-    }
+    const quotedTitle = extractQuoted(text);
     const dt = parseRuDateTime(text, ctx.tz, now);
     const priority = detectPriority(text);
-    const projM = text.match(/в\s+проект\w*\s+["«]?([^"»\n]{2,60})/i);
+    const projM = text.match(/в\s+проект[а-я]*\s+["«]?([^"»\n]{2,60})/i);
     let projectId: string | undefined;
     if (projM) {
       const pr = await callTool(userId, 'get_projects', {}, ctx, steps);
@@ -305,23 +445,65 @@ export async function runRuleTurn(
       projectId = found.id;
     }
     const tagM = [...text.matchAll(/с\s+тегом\s+([а-яa-z0-9_-]+)/gi)].map((m) => m[1]);
+
+    // Название: quoted > умное извлечение действия. Сырой текст — никогда.
+    const title = (quotedTitle || extractActionTitle(text)).slice(0, 200);
+    if (!title || title.length < 2) {
+      return fail('Как назвать задачу? Напиши, например: «Создай задачу Позвонить клиенту завтра в 15:00».');
+    }
+    // Время есть, а даты нет — уточняем, а не выдумываем.
+    if (!dt && /(?:в|к|на)\s+\d{1,2}(?::\d{2})?/.test(t) && !/подзадач/.test(t)) {
+      return fail(`Во сколько — понял, а на какой день поставить «${title}»? Напиши «сегодня» или «завтра».`);
+    }
+    // Описание — остаток смысла (без дат, которые уже в полях).
+    const description = extractDescription(text, title);
     const created = await callTool(
       userId, 'create_task',
       {
-        title: title.slice(0, 200),
+        title,
+        description: description || undefined,
         priority: priority || undefined,
-        dueDateISO: dt?.iso,
+        startDateISO: dt?.hasTime ? dt.iso : undefined,
+        dueDateISO: dt?.endISO || dt?.iso,
         projectId,
         tagNames: tagM.length ? tagM : undefined,
       },
       ctx, steps
     );
     const task = (created.data as any)?.task;
-    if (task) cards.push({ type: 'task', task });
-    const when = dt ? (dt.hasTime ? ` на ${formatInTz(dt.iso, ctx.tz)}` : `, ${dt.label}`) : '';
+    // Подзадачи прямо в запросе на создание ("...и сделай три подзадачи: ...").
+    let madeSubs: string[] = [];
+    if (task) {
+      const inlineItems = extractSubtaskItems(text);
+      if (inlineItems.length >= 2) {
+        for (const st of inlineItems) {
+          try {
+            await callTool(userId, 'create_subtask', { parentId: task.id, title: st.slice(0, 200) }, ctx, steps);
+            madeSubs.push(st);
+          } catch { /* одна не создалась — остальные пробуем */ }
+        }
+        const full = await callTool(userId, 'get_task', { taskId: task.id }, ctx, steps).catch(() => null);
+        const fresh = (full?.data as any) || task;
+        cards.push({ type: 'task', task: fresh });
+      } else if (task) {
+        cards.push({ type: 'task', task });
+      }
+    }
+    let when = '';
+    if (dt) {
+      const timeOf = (iso: string) => formatInTz(iso, ctx.tz).split(',')[1]?.trim() || '';
+      when = dt.endISO
+        ? ` на ${formatInTz(dt.iso, ctx.tz).split(',')[0]}, ${timeOf(dt.iso)} — ${timeOf(dt.endISO)}`
+        : dt.hasTime
+          ? ` на ${formatInTz(dt.iso, ctx.tz)}`
+          : `, ${dt.label}`;
+    }
+    let reply = `Готово. Создал задачу «${title}»${when}${priority ? `, приоритет ${priorityRu(priority)}` : ''}.`;
+    if (madeSubs.length) {
+      reply += `\n\nПодзадачи (${madeSubs.length}):\n${madeSubs.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
+    }
     return {
-      reply: `Готово. Создал задачу «${title.slice(0, 200)}»${when}${priority ? `, приоритет ${priorityRu(priority)}` : ''}.`,
-      steps, cards, lastTaskId: task?.id, lastTaskTitle: task?.title,
+      reply, steps, cards, lastTaskId: task?.id, lastTaskTitle: task?.title,
     };
   }
 
@@ -383,7 +565,8 @@ export async function runRuleTurn(
       pendingOps: list.map((x: any) => ({ tool: 'update_task', args: { taskId: x.id, dueDateISO: targetISO } })),
     };
   }
-  if (/завершен|выполнен|сделан|готов/.test(t) && /покажи|какие|список|что/.test(t)) {
+  // "готов" не должен матчить "подготовить": только отдельные слова
+  if (/(завершен|выполнен|сделан|готов)(?![а-я])/.test(t) && /покажи|какие|список|что/.test(t) && !/заметк|подзадач/.test(t)) {
     const r = await callTool(userId, 'search_tasks', { status: 'COMPLETED', limit: 10 }, ctx, steps);
     const list = (r.data as any)?.tasks || [];
     if (!list.length) return { reply: 'Завершённых задач пока нет.', steps, cards };
@@ -442,7 +625,14 @@ export async function runRuleTurn(
     return { reply: `С тегом «${tagName}»:\n${list.slice(0, 10).map((x: any) => `• ${taskLine(x)}`).join('\n')}`, steps, cards };
   }
 
-  // 6. Поиск задачи (заметки — в §11)
+  // 6. Поиск задачи (заметки — в §11).
+  // Чужие данные ("пользователя B") — явный отказ, не поиск.
+  if (/пользовател[яь]\s+[a-zа-я]/i.test(t) && /покажи|найди|задачи/.test(t)) {
+    return {
+      reply: 'Нет доступа к чужим данным. Могу показать только твои задачи — например: «Что осталось на сегодня?»',
+      steps, cards,
+    };
+  }
   if (/^(найди|найти|покажи|ищи|где)(?![а-я])/.test(t) && !/заметк/.test(t)) {
     const resolved = await resolveTask(userId, text, context, steps);
     if (!resolved) return fail(`Не нашёл задачу «${stripVerbs(text).slice(0, 80)}». Уточни название.`);
@@ -499,13 +689,95 @@ export async function runRuleTurn(
     }
     const dt = parseRuDateTime(text, ctx.tz, now);
     if (!dt) return fail('На когда перенести? Например: «на завтра в 16:00».');
-    const upd = await callTool(userId, 'update_task', { taskId: resolved.task.id, dueDateISO: dt.iso }, ctx, steps);
+    // TEST 3: дата без времени — сохраняем исходное время задачи, а не 12:00.
+    let dueISO = dt.iso;
+    let startISO: string | undefined;
+    if (dt.endISO) {
+      startISO = dt.iso;
+      dueISO = dt.endISO;
+    } else if (!dt.hasTime) {
+      const full = await callTool(userId, 'get_task', { taskId: resolved.task.id }, ctx, steps).catch(() => null);
+      const cur = (full?.data as any) || {};
+      if (cur.due) {
+        const oldT = new Date(cur.due);
+        const parts = new Intl.DateTimeFormat('en-GB', { timeZone: ctx.tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(oldT);
+        const [hh, mm] = parts.split(':').map(Number);
+        const day = dt.iso.slice(0, 10);
+        // Собираем wall-time старой задачи на новой дате в timezone пользователя
+        const [Y, M, D] = day.split('-').map(Number);
+        dueISO = zonedToISO(ctx.tz, Y, M, D, hh, mm);
+      }
+      if (cur.start) {
+        const day = dueISO.slice(0, 10);
+        const ot = new Date(cur.start);
+        const parts = new Intl.DateTimeFormat('en-GB', { timeZone: ctx.tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(ot);
+        const [hh, mm] = parts.split(':').map(Number);
+        const [Y, M, D] = day.split('-').map(Number);
+        startISO = zonedToISO(ctx.tz, Y, M, D, hh, mm);
+      }
+    }
+    const upd = await callTool(userId, 'update_task', { taskId: resolved.task.id, dueDateISO: dueISO, startDateISO: startISO }, ctx, steps);
     const task = (upd.data as any)?.task;
     if (task) cards.push({ type: 'task', task });
     return {
-      reply: `Готово — «${resolved.task.title}» перенесена на ${formatInTz(dt.iso, ctx.tz)}.`,
+      reply: `Готово — «${resolved.task.title}» перенесена на ${formatInTz(dueISO, ctx.tz)}.`,
       steps, cards, lastTaskId: resolved.task.id, lastTaskTitle: resolved.task.title,
     };
+  }
+  // TEST 4/5: только начало или только конец — остальные поля не трогаем.
+  {
+    const startM = text.match(/(?:поставь|сделай|измени|поменяй)\s+(начало|старт)\s+(?:в\s+)?(\d{1,2})(?::(\d{2}))?/i);
+    const endM = text.match(/(?:поставь|сделай|измени|поменяй)\s+(конец|окончание|финиш)\s+(?:в\s+|на\s+)?(\d{1,2})(?::(\d{2}))?/i);
+    if ((startM || endM) && (hasTarget || context.lastTaskId)) {
+      let resolved = await resolveTask(userId, text, context, steps);
+      if (!resolved && context.lastTaskId) {
+        try {
+          const gr = await callTool(userId, 'get_task', { taskId: context.lastTaskId }, ctx, steps);
+          resolved = { task: (gr.data as any)?.task || gr.data };
+        } catch { /* ниже */ }
+      }
+      if (!resolved || 'candidates' in resolved) {
+        return resolved && 'candidates' in resolved
+          ? { reply: 'Какую именно?', steps, cards, options: resolved.candidates.map((c, i) => ({ key: c.id, label: `${i + 1}. ${c.title}`, sub: c.sub })) }
+          : fail('Какую задачу изменить? Напиши название.');
+      }
+      const full = await callTool(userId, 'get_task', { taskId: resolved.task.id }, ctx, steps).catch(() => null);
+      const cur = (full?.data as any) || {};
+      // База: текущий день задачи (или сегодня), время из команды
+      const baseISO = cur.start || cur.due || new Date().toISOString();
+      const baseDay = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(baseISO)).split('-').map(Number);
+      const patch: any = { taskId: resolved.task.id };
+      let what = '';
+      if (startM) {
+        patch.startDateISO = zonedToISO(ctx.tz, baseDay[0], baseDay[1], baseDay[2], Number(startM[2]), Number(startM[3] || 0));
+        what = `начало в ${startM[2]}:${String(startM[3] || '00').padStart(2, '0')}`;
+      }
+      if (endM) {
+        patch.dueDateISO = zonedToISO(ctx.tz, baseDay[0], baseDay[1], baseDay[2], Number(endM[2]), Number(endM[3] || 0));
+        what = what ? `${what}, конец в ${endM[2]}:${String(endM[3] || '00').padStart(2, '0')}` : `конец в ${endM[2]}:${String(endM[3] || '00').padStart(2, '0')}`;
+      }
+      await callTool(userId, 'update_task', patch, ctx, steps);
+      return { reply: `Готово — «${resolved.task.title}»: ${what}. Остальное не трогал.`, steps, cards, lastTaskId: resolved.task.id, lastTaskTitle: resolved.task.title };
+    }
+  }
+  // Массовый приоритет: "поставь всем задачам проекта X высокий приоритет" (confirm)
+  {
+    const massP = t.match(/всем\s+задачам\s+проекта\s+["«]?([^"»\n?]{2,60})/);
+    if (massP) {
+      const pr = await callTool(userId, 'get_projects', {}, ctx, steps);
+      const found = ((pr.data as any)?.projects || []).find((p: any) => norm(p.name).includes(norm(massP[1].trim())));
+      if (!found) return fail(`Не нашёл проект «${massP[1].trim()}».`);
+      const lr = await callTool(userId, 'tasks_by_project', { projectId: found.id }, ctx, steps);
+      const list = (lr.data as any)?.tasks || [];
+      if (!list.length) return fail(`В проекте «${found.name}» нет открытых задач.`);
+      const p = detectPriority(text) || 'HIGH';
+      return {
+        reply: `В проекте «${found.name}» открытых задач: ${list.length}. Поставить всем приоритет «${priorityRu(p)}»?`,
+        steps, cards,
+        confirm: { token: '', kind: 'mass', summary: `Приоритет ${priorityRu(p)} для ${list.length} задач` },
+        pendingOps: list.map((x: any) => ({ tool: 'update_task', args: { taskId: x.id, priority: p } })),
+      };
+    }
   }
   if (/приоритет/.test(t) && hasTarget) {
     const resolved = await resolveTask(userId, text, context, steps);
@@ -573,7 +845,8 @@ export async function runRuleTurn(
     await callTool(userId, 'update_task', { taskId: resolved.task.id, title: newTitle.slice(0, 200) }, ctx, steps);
     return { reply: `Готово — новое название: «${newTitle.slice(0, 200)}».`, steps, cards, lastTaskId: resolved.task.id, lastTaskTitle: newTitle.slice(0, 200) };
   }
-  if (/описани/.test(t) && hasTarget) {
+  // Ветка подзадач (§10) имеет приоритет: "сделай из этапов подзадачи" — не описание
+  if (/описани/.test(t) && hasTarget && !/подзадач/.test(t)) {
     const resolved = await resolveTask(userId, text, context, steps);
     if (!resolved || 'candidates' in resolved) {
       return resolved && 'candidates' in resolved
@@ -595,9 +868,10 @@ export async function runRuleTurn(
 
   // 10. Подзадачи
   {
-    const splitM = t.match(/разбей|раздели|подели|разбить/);
+    // "разбей на 5", "сделай подзадачи", "из этапов сделай подзадачи"
+    const splitM = t.match(/разбей|раздели|подели|разбить/) || (/подзадач/.test(t) && /сделай|создай|из\s+этапов|этапы/.test(t) ? ['сделай'] : null);
     const countM = text.match(/на\s+(\d+)\s+подзадач/i);
-    if (splitM && hasTarget) {
+    if (splitM && (hasTarget || context.lastTaskId)) {
       let resolved = await resolveTask(userId, text, context, steps);
       if (!resolved && context.lastTaskId) {
         try {
@@ -765,7 +1039,89 @@ export async function runRuleTurn(
     return fail('Что сделать с заметкой? Например: «покажи», «добавь: текст», «замени: текст», «удали».');
   }
 
+  // Анализ задачи (§27) и умное улучшение (§28)
+  if (/посмотри|проанализируй|что.*не хватает|чего.*не хватает|разбери\s+задачу/.test(t) && hasTarget) {
+    const resolved = await resolveTask(userId, text, context, steps);
+    if (!resolved || 'candidates' in resolved) {
+      return resolved && 'candidates' in resolved
+        ? { reply: 'Какую именно?', steps, cards, options: resolved.candidates.map((c, i) => ({ key: c.id, label: `${i + 1}. ${c.title}`, sub: c.sub })) }
+        : fail('Какую задачу проанализировать?');
+    }
+    const full = await callTool(userId, 'get_task', { taskId: resolved.task.id }, ctx, steps);
+    const fd = (full.data as any) || {};
+    const gaps: string[] = [];
+    if (!fd.due && !fd.start) gaps.push('нет срока');
+    if (!fd.description) gaps.push('нет описания');
+    if (!(fd.subtasksTotal > 0)) {
+      const stages = splitToItems(fd.description || '', 6);
+      gaps.push(stages.length >= 2 ? `можно разделить на ${stages.length} этапов: ${stages.slice(0, 4).join('; ')}` : 'нет подзадач');
+    } else {
+      gaps.push(`подзадач: ${fd.subtasksTotal}`);
+    }
+    if (!fd.project) gaps.push('без проекта');
+    if (fd.priority === 'NONE') gaps.push('без приоритета');
+    cards.push({ type: 'task', task: fd });
+    return {
+      reply: `Посмотрел «${fd.title}»:\n${gaps.map((g) => `• ${g}`).join('\n')}`,
+      steps, cards, lastTaskId: fd.id, lastTaskTitle: fd.title,
+    };
+  }
+  if (/сделай.*нормально|улучши|улучшить\s+задачу|доведи\s+до\s+ума/.test(t) && hasTarget) {
+    const resolved = await resolveTask(userId, text, context, steps);
+    if (!resolved || 'candidates' in resolved) {
+      return resolved && 'candidates' in resolved
+        ? { reply: 'Какую именно?', steps, cards, options: resolved.candidates.map((c, i) => ({ key: c.id, label: `${i + 1}. ${c.title}`, sub: c.sub })) }
+        : fail('Какую задачу улучшить?');
+    }
+    const full = await callTool(userId, 'get_task', { taskId: resolved.task.id }, ctx, steps);
+    const fd = (full.data as any) || {};
+    const { result: newTitle } = await smartRewrite('professional', fd.title || '');
+    const stages = splitToItems(fd.description || '', 5);
+    const ops: { tool: string; args: any }[] = [];
+    if (newTitle && newTitle !== fd.title) ops.push({ tool: 'update_task', args: { taskId: fd.id, title: newTitle.slice(0, 200) } });
+    const subsRes = await callTool(userId, 'get_subtasks', { taskId: fd.id }, ctx, steps).catch(() => null);
+    const existingSubs = ((subsRes?.data as any)?.subtasks?.length || 0) as number;
+    let subNote = '';
+    if (!existingSubs && stages.length >= 2) {
+      for (const s of stages.slice(0, 5)) ops.push({ tool: 'create_subtask', args: { parentId: fd.id, title: s.slice(0, 200) } });
+      subNote = `\nПодзадачи (${Math.min(stages.length, 5)}):\n${stages.slice(0, 5).map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
+    }
+    if (!ops.length) return { reply: 'Задача уже в хорошем состоянии — менять нечего.', steps, cards, lastTaskId: fd.id, lastTaskTitle: fd.title };
+    return {
+      reply: `Предлагаю так:\n\nНазвание:\n${newTitle}${subNote}\n\nПрименить изменения?`,
+      steps, cards,
+      confirm: { token: '', kind: 'mass', summary: `Улучшение «${fd.title}»` },
+      pendingOps: ops,
+      lastTaskId: fd.id, lastTaskTitle: fd.title,
+    };
+  }
+
   // 12. Аналитика: день / неделя / рекомендации
+  // TEST 10: что сделано сегодня — только завершённые
+  if (/что\s+я\s+сегодня\s+сделал|что\s+сделано\s+сегодня|мои\s+заверш[её]нные\s+сегодня/.test(t)) {
+    const r = await callTool(userId, 'today_tasks', {}, ctx, steps);
+    const list = ((r.data as any)?.tasks || []).filter((x: any) => x.status === 'COMPLETED');
+    if (!list.length) return { reply: 'Сегодня пока ничего не завершено.', steps, cards };
+    cards.push({ type: 'tasklist', title: 'Завершено сегодня', tasks: list.slice(0, 10) });
+    return { reply: `Сегодня завершено (${list.length}):\n${list.slice(0, 10).map((x: any) => `✓ ${x.title}`).join('\n')}`, steps, cards };
+  }
+  // TEST 11: что осталось / не выполнено
+  if (/что\s+осталось|что\s+не\s+выполнено|невыполнен|остаток\s+на\s+сегодня|мои\s+незаверш/.test(t)) {
+    const r = await callTool(userId, 'today_tasks', {}, ctx, steps);
+    const list = ((r.data as any)?.tasks || []).filter((x: any) => x.status !== 'COMPLETED');
+    if (!list.length) return { reply: 'Всё выполнено, остатка нет. Отличный день!', steps, cards };
+    cards.push({ type: 'tasklist', title: 'Осталось', tasks: list.slice(0, 10) });
+    return { reply: `Осталось (${list.length}):\n${list.slice(0, 10).map((x: any) => `• ${taskLine(x)}`).join('\n')}`, steps, cards };
+  }
+  // §34: что мы только что сделали — по истории разговора
+  if (/что\s+мы\s+(только\s+что\s+)?(сделали|делали|выполнили|создали)/.test(t)) {
+    const done = (history || [])
+      .filter((m) => m.role === 'assistant' && m.content && !/не (совсем )?понял|как (назвать|ую)/i.test(m.content))
+      .slice(-3)
+      .map((m) => m.content.replace(/[#*`_]/g, '').trim().split('\n')[0].slice(0, 160));
+    if (!done.length) return { reply: 'Пока ничего не делали — с чего начнём?', steps, cards };
+    return { reply: `Что мы сделали:\n${done.map((d) => `• ${d}`).join('\n')}`, steps, cards };
+  }
   if (/как\s+прош[её]л|итоги\s+дня|мой\s+день|подведи\s+итог/.test(t)) {
     const r = await callTool(userId, 'day_summary', {}, ctx, steps);
     const d = (r.data as any) || {};
