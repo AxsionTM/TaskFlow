@@ -36,6 +36,30 @@ export function invalidateMaintenanceCache() {
   maintenanceCache = null;
 }
 
+/**
+ * Maintenance gate — отдельный шаг цепочки ПОСЛЕ authentication.
+ * Порядок: security → authentication → identify (authMiddleware) →
+ * maintenance check → authorization (requireAdmin / ownership per-route).
+ * ADMIN сюда не попадает вовсе: admin-роутер монтируется без этого gate,
+ * bypass структурный, а не условный. Обычный пользователь с любым
+ * (в т.ч. поддельным) JWT пройти не может: без валидной ADMIN-сессии
+ * gate всегда отвечает 503 при включённом режиме.
+ */
+export async function maintenanceGate(req: AuthRequest, _res: Response, next: NextFunction) {
+  try {
+    if (!req.userId) {
+      return next(new AppError(401, 'Требуется авторизация'));
+    }
+    const maintenance = await isMaintenanceOn();
+    if (maintenance.enabled) {
+      return next(new AppError(503, maintenance.message, 'MAINTENANCE'));
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function authMiddleware(
   req: AuthRequest,
   _res: Response,
@@ -75,15 +99,6 @@ export async function authMiddleware(
       payload.iat * 1000 < user.passwordChangedAt.getTime()
     ) {
       return next(new AppError(401, 'Пароль был изменён. Войдите снова.', 'PASSWORD_CHANGED'));
-    }
-
-    // Maintenance mode: администраторы продолжают работать, остальные — нет.
-    // Реализовано на backend-уровне, а не скрытием интерфейса.
-    if (user.role !== 'ADMIN') {
-      const maintenance = await isMaintenanceOn();
-      if (maintenance.enabled) {
-        return next(new AppError(503, maintenance.message, 'MAINTENANCE'));
-      }
     }
 
     req.userId = user.id;

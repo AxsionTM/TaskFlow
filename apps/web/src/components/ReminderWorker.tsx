@@ -19,6 +19,8 @@ export function ReminderWorker() {
     if (typeof window === 'undefined') return;
 
     const tick = async () => {
+      // Во время maintenance не спамим backend заведомо-503 запросами.
+      if (api.isMaintenanceKnown()) return;
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
       const state = useTasksStore.getState();

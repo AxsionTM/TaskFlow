@@ -14,6 +14,16 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 class ApiClient {
   private token: string | null = null;
+  /** Известный maintenance-режим: фоновые воркеры не спамят запросами. */
+  private maintenanceKnown = false;
+
+  isMaintenanceKnown(): boolean {
+    return this.maintenanceKnown;
+  }
+
+  clearMaintenanceKnown() {
+    this.maintenanceKnown = false;
+  }
 
   setToken(token: string | null) {
     this.token = token;
@@ -52,12 +62,18 @@ class ApiClient {
       const error = await res.json().catch(() => ({ error: { message: `Ошибка ${res.status}` } }));
       const msg = error.error?.message || error.message || `Ошибка ${res.status}`;
       const code = error.error?.code || error.code;
+      // Централизованная обработка maintenance: один флаг + событие для стора,
+      // без спама повторными запросами и десятками ошибок в консоли.
+      if (res.status === 503 && code === 'MAINTENANCE' && typeof window !== 'undefined') {
+        this.maintenanceKnown = true;
+        window.dispatchEvent(new CustomEvent('tf:maintenance', { detail: { message: msg } }));
+      }
       throw new ApiError(msg, res.status, code);
     }
     return res.json();
   }
 
-  register(data: { email: string; password: string; confirmPassword: string; name?: string }) {
+  register(data: { email: string; password: string; confirmPassword: string; name?: string; turnstileToken?: string }) {
     return this.request<{
       requiresVerification: boolean;
       email: string;

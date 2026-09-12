@@ -10,6 +10,8 @@ import { sendVerificationCode, isEmailConfigured } from '../../common/utils/mail
 import { issueCode, consumeCode, invalidateCodes } from '../../common/utils/verification';
 import { loginLimiter, registerLimiter } from '../../common/middleware/rate-limits';
 import { signToken, verifyToken } from '../../common/utils/jwt';
+import { verifyTurnstileToken } from '../../common/utils/turnstile';
+import { abuseConfig, checkRegistrationAbuse, clientIpHash, recordAttempt } from '../../common/utils/abuse';
 
 const router = Router();
 
@@ -20,7 +22,8 @@ const registerSchema = z.object({
   email: z.string().email('Некорректный email'),
   password: z.string().min(6, 'Пароль должен быть не менее 6 символов'),
   confirmPassword: z.string().min(1, 'Повторите пароль'),
-  name: z.string().min(1).optional(),
+  name: z.string().min(1).max(100).optional(),
+  turnstileToken: z.string().max(4096).optional(),
 });
 
 // Строгий лимит для кодовых эндпоинтов: защита от перебора и спама письмами.
@@ -158,42 +161,62 @@ router.post('/register', registerLimiter, async (req, res, next) => {
       throw new AppError(400, 'Пароли не совпадают');
     }
 
+    const email = data.email.toLowerCase();
+
+    // 1. Turnstile: только server-side проверка, секрет не покидает backend.
+    // Без пройденной капчи (при настроенных ключах) регистрация отклоняется.
+    const xff = req.headers['x-forwarded-for'];
+    const clientIp = (typeof xff === 'string' && xff.length ? xff.split(',')[0].trim() : req.ip) || undefined;
+    const ts = await verifyTurnstileToken(data.turnstileToken, clientIp);
+    if (!ts.ok) {
+      throw new AppError(400, ts.error, 'TURNSTILE_FAILED');
+    }
+
+    // 2. Anti-abuse: временные лимиты по IP/частоте (без вечных банов).
+    const ipHash = clientIpHash(req);
+    await checkRegistrationAbuse(ipHash, email);
+
     // В production без настроенного SMTP регистрация бессмысленна
-    // (код подтверждения не дойдёт) — отказываем сразу, до создания пользователя.
+    // (код подтверждения не дойдёт) — отказываем до создания записей.
     if (process.env.NODE_ENV === 'production' && !isEmailConfigured()) {
       throw new AppError(503, 'Регистрация временно недоступна. Попробуйте позже.');
     }
 
-    const existing = await prisma.user.findUnique({
-      where: { email: data.email.toLowerCase() },
-    });
-
+    const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       throw new AppError(409, 'Пользователь с таким email уже существует');
     }
 
+    // 3. Полноценный User НЕ создаём: только временная pending-запись с TTL.
+    // PostgreSQL не забивается мусорными аккаунтами ботов.
     const passwordHash = await bcrypt.hash(data.password, 12);
-
-    const user = await prisma.user.create({
-      data: {
-        email: data.email.toLowerCase(),
+    const now = new Date();
+    await prisma.pendingRegistration.upsert({
+      where: { email },
+      update: {
+        name: data.name || email.split('@')[0],
         passwordHash,
-        name: data.name || data.email.split('@')[0],
-        emailVerified: false,
-        lastActiveAt: new Date(),
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + abuseConfig.pendingTtlMin * 60 * 1000),
+      },
+      create: {
+        email,
+        name: data.name || email.split('@')[0],
+        passwordHash,
+        expiresAt: new Date(now.getTime() + abuseConfig.pendingTtlMin * 60 * 1000),
       },
     });
 
-    await ensureInbox(user.id);
+    await recordAttempt(ipHash, email);
 
     // Код подтверждения: пользователь активируется только после verify-email.
     // Токен сессии НЕ выдаём до подтверждения почты.
-    const code = await issueCode(user.email, 'VERIFY_EMAIL');
-    const mail = await sendVerificationCode({ to: user.email, code, kind: 'verify' });
+    const code = await issueCode(email, 'VERIFY_EMAIL');
+    const mail = await sendVerificationCode({ to: email, code, kind: 'verify' });
 
     res.status(201).json({
       requiresVerification: true,
-      email: user.email,
+      email,
       emailSent: mail.sent,
       ...(mail.devCode ? { devCode: mail.devCode } : {}),
     });
@@ -213,9 +236,53 @@ router.post('/verify-email', codeLimiter, async (req, res, next) => {
       })
       .parse(req.body);
 
-    const user = await prisma.user.findUnique({
-      where: { email: data.email.toLowerCase() },
-    });
+    const email = data.email.toLowerCase();
+
+    // Новый flow: pending-регистрация превращается в полноценного User
+    // ТОЛЬКО после успешного кода. До этого в users ничего нет.
+    const pending = await prisma.pendingRegistration.findUnique({ where: { email } });
+    if (pending) {
+      if (pending.expiresAt.getTime() <= Date.now()) {
+        await prisma.pendingRegistration.delete({ where: { id: pending.id } }).catch(() => {});
+        throw new AppError(400, 'Срок действия кода истёк. Зарегистрируйтесь снова.', 'CODE_EXPIRED');
+      }
+      // Anti-bot: слишком быстрое подтверждение после создания pending.
+      if (Date.now() - pending.createdAt.getTime() < abuseConfig.minVerifyDelaySec * 1000) {
+        throw new AppError(429, 'Подождите немного и попробуйте снова.', 'RATE_LIMITED');
+      }
+      await consumeCode(email, 'VERIFY_EMAIL', data.code);
+      const now = new Date();
+      const created = await prisma.user.create({
+        data: {
+          email,
+          passwordHash: pending.passwordHash,
+          name: pending.name || email.split('@')[0],
+          emailVerified: true,
+          emailVerifiedAt: now,
+          lastActiveAt: now,
+        },
+      });
+      await prisma.pendingRegistration.delete({ where: { id: pending.id } }).catch(() => {});
+      const inboxId = await ensureInbox(created.id);
+      const token = generateToken(created.id);
+      return res.json({
+        user: {
+          id: created.id,
+          email: created.email,
+          name: created.name,
+          theme: created.theme,
+          locale: created.locale,
+          emailVerified: true,
+          role: created.role,
+        },
+        token,
+        inboxId,
+      });
+    }
+
+    // Legacy-путь: пользователи, созданные до pending-flow (уже в users,
+    // но emailVerified=false). Новых таких больше не появляется.
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       throw new AppError(400, 'Неверный код. Проверьте и попробуйте снова.', 'INVALID_CODE');
     }
@@ -262,6 +329,29 @@ router.post('/resend-code', codeLimiter, async (req, res, next) => {
       data.purpose === 'reset' ? 'RESET_PASSWORD' : 'VERIFY_EMAIL';
 
     const user = await prisma.user.findUnique({ where: { email } });
+
+    // Pending-регистрация: продлеваем жизнь и шлём код заново.
+    if (!user && target === 'VERIFY_EMAIL') {
+      const pending = await prisma.pendingRegistration.findUnique({ where: { email } });
+      if (pending) {
+        await prisma.pendingRegistration
+          .update({
+            where: { id: pending.id },
+            data: { expiresAt: new Date(Date.now() + abuseConfig.pendingTtlMin * 60 * 1000) },
+          })
+          .catch(() => {});
+        const code = await issueCode(email, target);
+        const mail = await sendVerificationCode({ to: email, code, kind: 'verify' });
+        return res.json({
+          ok: true,
+          emailSent: mail.sent,
+          message: mail.sent
+            ? 'Мы отправили код на вашу почту.'
+            : 'Почтовый сервер не настроен. Используйте код из ответа (dev-режим).',
+          ...(mail.devCode ? { devCode: mail.devCode } : {}),
+        });
+      }
+    }
 
     // Не раскрываем существование аккаунта для reset; для verify тоже отвечаем
     // нейтрально, если пользователя нет.

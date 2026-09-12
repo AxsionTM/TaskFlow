@@ -231,6 +231,32 @@ enum VerificationPurpose {
   RESET_PASSWORD
 }
 
+// Временная pending-регистрация: полноценный User создаётся ТОЛЬКО после
+// подтверждения email-кода. PostgreSQL не забивается мусорными аккаунтами.
+model PendingRegistration {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  @@index([expiresAt])
+  @@map("pending_registrations")
+}
+
+// Anti-abuse сигналы: только хеши, TTL 24ч, отделены от User.
+// Удаление пользователя не мешает повторной регистрации тем же email.
+model RegistrationAttempt {
+  id        String   @id @default(cuid())
+  ipHash    String
+  emailHash String?
+  createdAt DateTime @default(now())
+
+  @@index([ipHash, createdAt])
+  @@map("registration_attempts")
+}
+
 // Одноразовые коды подтверждения (email verify / password reset).
 // Сам код хранится только в виде sha256-хэша, живёт 15 минут,
 // после 5 неудачных попыток или успешного использования инвалидируется.

@@ -113,7 +113,7 @@ export function NotificationCenter({ dark = false }: { dark?: boolean }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-[95] mt-2 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-primary/25 bg-[#0d1326] shadow-[0_24px_64px_-12px_rgba(0,0,0,.8),0_0_32px_-12px_var(--tf-glow)]">
+        <div className="tf-notif-dropdown absolute right-0 top-full z-[95] mt-2 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-primary/25 bg-[#0d1326] shadow-[0_24px_64px_-12px_rgba(0,0,0,.8),0_0_32px_-12px_var(--tf-glow)]">
           <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
             <span className="text-sm font-bold text-white">Уведомления</span>
             {unread > 0 && (
@@ -126,7 +126,7 @@ export function NotificationCenter({ dark = false }: { dark?: boolean }) {
               </button>
             )}
           </div>
-          <div className="max-h-[50dvh] overflow-y-auto p-2">
+          <div className="tf-notif-list max-h-[50dvh] overflow-y-auto p-2">
             {loading && items.length === 0 ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-slate-500" />

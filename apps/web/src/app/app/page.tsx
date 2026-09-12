@@ -56,6 +56,20 @@ export default function AppPage() {
     checkAuth();
   }, [checkAuth]);
 
+  // Централизованное событие maintenance от API-клиента: показываем страницу
+  // сразу при первом 503, не дожидаясь следующих запросов.
+  useEffect(() => {
+    const onMaintenance = (e: Event) => {
+      const message = (e as CustomEvent).detail?.message || 'Технические работы';
+      const { user: u } = useAuthStore.getState();
+      if (u?.role !== 'ADMIN') {
+        useAuthStore.setState({ maintenance: { message } });
+      }
+    };
+    window.addEventListener('tf:maintenance', onMaintenance);
+    return () => window.removeEventListener('tf:maintenance', onMaintenance);
+  }, []);
+
   // Независимая проверка техрежима напрямую с backend (не только через /me):
   // переживает кэши инстансов и срабатывает сразу после refresh.
   useEffect(() => {
@@ -66,6 +80,9 @@ export default function AppPage() {
         if (!alive) return;
         if (s.maintenance.enabled) {
           useAuthStore.setState({ maintenance: { message: s.maintenance.message } });
+        } else {
+          api.clearMaintenanceKnown();
+          useAuthStore.setState({ maintenance: null });
         }
       })
       .catch(() => {});

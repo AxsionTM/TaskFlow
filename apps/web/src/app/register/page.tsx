@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Check, Loader2, Rocket } from 'lucide-react';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { useAuthStore } from '@/stores/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,8 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,10 +30,17 @@ export default function RegisterPage() {
     }
     setIsLoading(true);
     try {
-      const { email: registeredEmail } = await register(email, password, name || undefined);
+      const { email: registeredEmail } = await register(
+        email,
+        password,
+        name || undefined,
+        turnstileToken || undefined
+      );
       router.push(`/verify?email=${encodeURIComponent(registeredEmail)}`);
     } catch (err: any) {
       setError(err.message || 'Ошибка регистрации');
+      // Сбрасываем капчу после неудачи, чтобы бот не переиспользовал токен.
+      setTurnstileToken('');
     } finally {
       setIsLoading(false);
     }
@@ -101,6 +111,16 @@ export default function RegisterPage() {
                 <label className="text-sm font-medium text-slate-300">Повторите пароль</label>
                 <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Повторите пароль" required minLength={6} autoComplete="new-password" className="h-11 bg-white/[0.03] border-white/10" />
               </div>
+
+              {turnstileSiteKey && (
+                <Turnstile
+                  siteKey={turnstileSiteKey}
+                  onSuccess={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken('')}
+                  onError={() => setTurnstileToken('')}
+                  options={{ theme: 'dark', size: 'flexible' }}
+                />
+              )}
 
               <Button type="submit" className="h-11 w-full rounded-xl font-semibold" disabled={isLoading}>
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Создание...</> : 'Создать аккаунт'}

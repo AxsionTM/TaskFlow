@@ -25,6 +25,7 @@ import {
   Users,
   X,
   Zap,
+  type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -97,7 +98,7 @@ function Logo() {
 }
 
 function ProductPreview() {
-  const miniTasks = [
+  const miniTasks: [string, boolean][] = [
     ['Закончить дизайн главной', true],
     ['Подготовить план на неделю', true],
     ['30 минут чтения', false],
@@ -126,13 +127,15 @@ function ProductPreview() {
               TaskFlow
             </div>
             <div className="space-y-1.5 text-xs">
-              {[
-                [LayoutDashboard, 'Сегодня', true],
-                [CalendarDays, 'Календарь', false],
-                [Target, 'Цели', false],
-                [Flame, 'Привычки', false],
-                [Timer, 'Фокус', false],
-              ].map(([Icon, label, active]) => (
+              {(
+                [
+                  [LayoutDashboard, 'Сегодня', true],
+                  [CalendarDays, 'Календарь', false],
+                  [Target, 'Цели', false],
+                  [Flame, 'Привычки', false],
+                  [Timer, 'Фокус', false],
+                ] as [LucideIcon, string, boolean][]
+              ).map(([Icon, label, active]) => (
                 <div
                   key={label as string}
                   className={`flex items-center gap-2 rounded-lg px-3 py-2.5 ${active ? 'bg-primary/15 text-primary' : 'text-slate-500'}`}

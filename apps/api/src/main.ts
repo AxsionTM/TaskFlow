@@ -22,7 +22,7 @@ import { notesRouter } from "./modules/notes/notes.routes";
 import { notificationsRouter } from "./modules/notifications/notifications.routes";
 import { adminRouter } from "./modules/admin/admin.routes";
 import { errorHandler } from "./common/middleware/error-handler";
-import { authMiddleware } from "./common/middleware/auth";
+import { authMiddleware, maintenanceGate } from "./common/middleware/auth";
 import {
   writeLimiter,
   aiLimiter,
@@ -39,6 +39,9 @@ if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
 }
 if (!process.env.JWT_SECRET) {
   console.warn('WARNING: JWT_SECRET is not set, using insecure development fallback. Never use this in production.');
+}
+if (!process.env.TURNSTILE_SECRET_KEY) {
+  console.warn('WARNING: TURNSTILE_SECRET_KEY is not set, registration runs without CAPTCHA. Set it in production.');
 }
 if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
   throw new Error('FATAL: DATABASE_URL is not set. Refusing to start in production.');
@@ -159,19 +162,22 @@ app.get("/health", (_req, res) => {
 
 app.use("/auth", authRouter);
 
-app.use("/tasks", authMiddleware, writeLimiter, tasksRouter);
-app.use("/projects", authMiddleware, writeLimiter, projectsRouter);
-app.use("/tags", authMiddleware, writeLimiter, tagsRouter);
-app.use("/habits", authMiddleware, writeLimiter, habitsRouter);
-app.use("/goals", authMiddleware, writeLimiter, goalsRouter);
-app.use("/focus", authMiddleware, writeLimiter, focusRouter);
-app.use("/smart-lists", authMiddleware, writeLimiter, smartListsRouter);
-app.use("/ai", authMiddleware, aiLimiter, aiRouter);
-app.use("/export", authMiddleware, exportLimiter, exportRouter);
-app.use("/birthdays", authMiddleware, writeLimiter, birthdaysRouter);
-app.use("/graph", authMiddleware, graphRouter);
-app.use("/notes", authMiddleware, writeLimiter, notesRouter);
-app.use("/notifications", authMiddleware, notificationsRouter);
+// Пользовательские API: authentication → maintenanceGate → router.
+// Админка (/admin) намеренно БЕЗ maintenanceGate: bypass структурный —
+// admin-роутер требует валидную ADMIN-сессию (authMiddleware + requireAdmin).
+app.use("/tasks", authMiddleware, maintenanceGate, writeLimiter, tasksRouter);
+app.use("/projects", authMiddleware, maintenanceGate, writeLimiter, projectsRouter);
+app.use("/tags", authMiddleware, maintenanceGate, writeLimiter, tagsRouter);
+app.use("/habits", authMiddleware, maintenanceGate, writeLimiter, habitsRouter);
+app.use("/goals", authMiddleware, maintenanceGate, writeLimiter, goalsRouter);
+app.use("/focus", authMiddleware, maintenanceGate, writeLimiter, focusRouter);
+app.use("/smart-lists", authMiddleware, maintenanceGate, writeLimiter, smartListsRouter);
+app.use("/ai", authMiddleware, maintenanceGate, aiLimiter, aiRouter);
+app.use("/export", authMiddleware, maintenanceGate, exportLimiter, exportRouter);
+app.use("/birthdays", authMiddleware, maintenanceGate, writeLimiter, birthdaysRouter);
+app.use("/graph", authMiddleware, maintenanceGate, graphRouter);
+app.use("/notes", authMiddleware, maintenanceGate, writeLimiter, notesRouter);
+app.use("/notifications", authMiddleware, maintenanceGate, notificationsRouter);
 app.use("/admin", adminLimiter, adminRouter);
 
 app.use(errorHandler);

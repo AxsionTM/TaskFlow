@@ -25,7 +25,7 @@ interface AuthState {
   /** Maintenance mode: показывается полноэкранное уведомление */
   maintenance: { message: string } | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name?: string) => Promise<{ email: string; devCode?: string }>;
+  register: (email: string, password: string, name?: string, turnstileToken?: string) => Promise<{ email: string; devCode?: string }>;
   verifyEmail: (email: string, code: string) => Promise<void>;
   resendCode: (email: string, purpose?: 'verify' | 'reset') => Promise<{ message: string; devCode?: string }>;
   forgotPassword: (email: string) => Promise<{ message: string; devCode?: string }>;
@@ -70,8 +70,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  register: async (email, password, name) => {
-    const res = await api.register({ email, password, confirmPassword: password, name });
+  register: async (email, password, name, turnstileToken) => {
+    const res = await api.register({ email, password, confirmPassword: password, name, turnstileToken });
     // Токен до подтверждения не выдаётся — только pending email.
     set({ pendingVerificationEmail: res.email });
     return { email: res.email, devCode: res.devCode };

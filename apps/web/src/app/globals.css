@@ -1709,3 +1709,24 @@ body::before {
   box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2), 0 0 16px -4px var(--tf-glow);
   outline: none;
 }
+
+/* ===== Notification dropdown: viewport-safe positioning ===== */
+/* Причина старого уезжания: absolute right-0 относительно кнопки-колокола,
+   которая на мобильном НЕ у правого края (рядом аватар) — панель 360px
+   вылезала за viewport. На телефоне панель fixed относительно viewport. */
+@media (max-width: 767px) {
+  .tf-notif-dropdown {
+    position: fixed !important;
+    left: 8px !important;
+    right: 8px !important;
+    top: 60px !important;
+    width: auto !important;
+    max-width: none !important;
+    margin-top: 0 !important;
+  }
+  .tf-notif-dropdown .tf-notif-list {
+    max-height: min(70dvh, 500px) !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
