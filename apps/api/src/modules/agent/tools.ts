@@ -128,10 +128,12 @@ export const TOOLS: ToolDef[] = [
         take: Math.min(Math.max(Number(a.limit) || 10, 1), 20),
       });
       const total = await prisma.task.count({ where });
+      const serialized = tasks.map((t) => serializeTask(t, ctx.tz));
       return {
         ok: true,
         summary: total > tasks.length ? `Найдено ${total}, показываю ${tasks.length}` : `Найдено: ${total}`,
-        data: { total, tasks: tasks.map((t) => serializeTask(t, ctx.tz)) },
+        data: { total, tasks: serialized },
+        card: serialized.length ? { type: 'tasklist', title: 'Найдено', tasks: serialized.slice(0, 8) } : undefined,
       };
     },
   },
