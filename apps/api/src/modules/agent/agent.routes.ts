@@ -264,7 +264,8 @@ router.post('/chat', async (req: AuthRequest, res, next) => {
         ctxJson.lastTaskTitle = out.lastTaskTitle ?? null;
       }
       // Кандидаты выбора живут в контексте до следующего хода.
-      if (options?.length) {
+      // Подсказки fallback (ключи o1..o3) — не кандидаты, их не запоминаем.
+      if (options?.length && !options.every((o) => /^o\d+$/.test(o.key))) {
         ctxJson.pendingChoice = { candidates: options.map((o) => ({ id: o.key, title: o.label, sub: o.sub })) };
       } else {
         ctxJson.pendingChoice = null;

@@ -401,33 +401,56 @@ export async function runRuleTurn(
   const ctx = { tz: context.tz || 'UTC' };
   const fail = (reply: string): TurnResult => ({ reply, steps, cards });
 
-  // 0. Выбор из кандидатов ("вторую", "последнюю", точное название)
+  // 0. Выбор из кандидатов ("вторую", "последнюю", точное название).
+  // Если ввод похож на выбор — обрабатываем; иначе пропускаем дальше
+  // к интентам (без ловушки вечного «какую выбрать?»).
   if (context.pendingChoice?.candidates?.length) {
     const cands = context.pendingChoice.candidates;
     const idx = parseOrdinal(text, cands.length);
-    const byTitle = cands.find((c) => norm(c.title).includes(t) || t.includes(norm(c.title)));
-    const picked = byTitle || (idx !== null ? cands[idx] : null);
-    if (picked) {
-      try {
-        const r = await callTool(userId, 'get_task', { taskId: picked.id }, ctx, steps);
-        const task = (r.data as any)?.task || r.data;
-        cards.push({ type: 'task', task });
-        return {
-          reply: `Выбрал «${task.title}». Что с ней сделать?`,
-          steps, cards,
-          lastTaskId: task.id, lastTaskTitle: task.title,
-        };
-      } catch {
-        return fail('Не смог открыть задачу. Попробуй ещё раз.');
+    const looksLikeChoice =
+      idx !== null ||
+      /^\d+\.?$/.test(t) ||
+      cands.some((c) => norm(c.title).includes(t) || (t.length > 3 && t.includes(norm(c.title))));
+    if (looksLikeChoice) {
+      const byTitle = cands.find((c) => norm(c.title).includes(t) || t.includes(norm(c.title)));
+      const picked = byTitle || (idx !== null ? cands[idx] : null);
+      if (picked) {
+        try {
+          const r = await callTool(userId, 'get_task', { taskId: picked.id }, ctx, steps);
+          const task = (r.data as any)?.task || r.data;
+          cards.push({ type: 'task', task });
+          return {
+            reply: `Выбрал «${task.title}». Что с ней сделать?`,
+            steps, cards,
+            lastTaskId: task.id, lastTaskTitle: task.title,
+          };
+        } catch {
+          return fail('Не смог открыть задачу. Попробуй ещё раз.');
+        }
       }
-    }
-    if (t.length < 60) {
       return {
         reply: 'Какую именно выбрать? Напиши номер или название.',
         steps, cards,
         options: cands.map((c, i) => ({ key: String(i), label: `${i + 1}. ${c.title}`, sub: c.sub })),
       };
     }
+  }
+
+  // 0. Приветствие / благодарность / помощь — отвечаем сразу, без tools.
+  if (/^(привет|здравствуй|добрый\s+день|добрый\s+вечер|hello|йо|ку)(?![а-я])/.test(t)) {
+    return {
+      reply: 'Привет! Я помогу с задачами: найду, создам, перенесу, разобью на подзадачи, подведу итоги дня. Просто напиши, что нужно.',
+      steps, cards,
+    };
+  }
+  if (/^(спасибо|благодарю|супер|отлично|класс)(?![а-я])/.test(t)) {
+    return { reply: 'Пожалуйста! Обращайся, если что-то понадобится.', steps, cards };
+  }
+  if (/что\s+ты\s+умеешь|твои\s+возможности|^помощь|команды|help/.test(t)) {
+    return {
+      reply: 'Вот что я умею:\n• Найти, создать, перенести, завершить задачи\n• Разбить на подзадачи (в т.ч. из заметки)\n• Работать с заметками, тегами, проектами\n• Итоги дня и недели, рекомендации\n• Привычки, цели, фокус\n\nНапример: «Что осталось на сегодня?»',
+      steps, cards,
+    };
   }
 
   // 1. Создание задачи (но не заметки — их разбирает §11).
@@ -516,7 +539,7 @@ export async function runRuleTurn(
   }
 
   // 3. Списки: сегодня / завтра / неделя / просроченные / завершённые / в работе / без срока / высокий приоритет
-  if (/что\s+осталось|осталось\s+на\s+сегодня|что\s+на\s+сегодня|мои\s+задачи\s+на\s+сегодня|задачи\s+на\s+сегодня/.test(t)) {
+  if (/что\s+осталось|осталось\s+на\s+сегодня|что\s+на\s+сегодня|мои\s+задачи\s+на\s+сегодня|задачи\s+на\s+сегодня|задачи.*на\s+сегодня|что.*сегодня/.test(t) && !/сделал|заверш|выполн/.test(t)) {
     const r = await callTool(userId, 'today_tasks', {}, ctx, steps);
     const list = (r.data as any)?.tasks || [];
     if (!list.length) return { reply: 'На сегодня задач нет. Отдыхай или создай новую — просто напиши.', steps, cards };
@@ -634,8 +657,15 @@ export async function runRuleTurn(
     };
   }
   if (/^(найди|найти|покажи|ищи|где)(?![а-я])/.test(t) && !/заметк/.test(t)) {
+    const query = stripVerbs(text).slice(0, 80);
+    if (!query) {
+      return {
+        reply: 'Какую задачу найти? Уточни название — например: «Найди задачу про юриста».',
+        steps, cards,
+      };
+    }
     const resolved = await resolveTask(userId, text, context, steps);
-    if (!resolved) return fail(`Не нашёл задачу «${stripVerbs(text).slice(0, 80)}». Уточни название.`);
+    if (!resolved) return fail(`Не нашёл задачу «${query}». Уточни название.`);
     if ('candidates' in resolved) {
       return {
         reply: `Нашёл несколько. Какую выбрать?`,
@@ -681,7 +711,9 @@ export async function runRuleTurn(
 
   // 9. Перенос срока / время / приоритет / проект / теги / название / описание
   const hasTarget = /(ее|его|ею|ей|ему|им|ней|эту|этот|этой|задач[ауе]|^перенеси|^поставь|^измени|^сделай|^поменяй)/.test(t);
-  if (/перенес|перенести|поставь\s+срок|срок\s+на|измени\s+время|время\s+на|дедлайн/.test(t) || (/на\s+(завтра|сегодня|понедельник|следующей)/.test(t) && hasTarget)) {
+  // Вопрос ("какие задачи на сегодня?") — это список, а не перенос.
+  const isQuestion = /^(что|какие|покажи|показать|список|есть|сколько|где)(?![а-я])/.test(t);
+  if ((/перенес|перенести|поставь\s+срок|срок\s+на|измени\s+время|время\s+на|дедлайн/.test(t) || (/на\s+(завтра|сегодня|понедельник|следующей)/.test(t) && hasTarget)) && !isQuestion) {
     const resolved = await resolveTask(userId, text, context, steps);
     if (!resolved) return fail('Какую задачу перенести? Напиши название.');
     if ('candidates' in resolved) {
@@ -1132,7 +1164,7 @@ export async function runRuleTurn(
     else if (d.left === 0) reply += '\n\nВсё сделано. Отличный результат!';
     return { reply, steps, cards };
   }
-  if (/как\s+прошла\s+недел|итоги\s+недели|анализ\s+недели/.test(t)) {
+  if (/как\s+прошла.*недел|итоги\s+недели|анализ\s+недели|как\s+неделя/.test(t)) {
     const r = await callTool(userId, 'productivity_stats', { days: 7 }, ctx, steps);
     const d = (r.data as any) || {};
     return { reply: `Неделя: создано ${d.created}, завершено ${d.completed}.`, steps, cards };
@@ -1203,9 +1235,14 @@ export async function runRuleTurn(
     };
   }
 
-  // 14. Fallback
+  // 14. Fallback — с кнопками-подсказками вместо глухого текста
   return {
-    reply: 'Не совсем понял. Могу: найти/создать/перенести/завершить задачи, разбить на подзадачи, работать с заметками, показать итоги дня. Попробуй, например: «Что осталось на сегодня?»',
+    reply: 'Не совсем понял. Выбери, что нужно, или напиши по-своему:',
     steps, cards,
+    options: [
+      { key: 'o1', label: 'Что осталось на сегодня?' },
+      { key: 'o2', label: 'Как прошёл мой день?' },
+      { key: 'o3', label: 'Покажи просроченные задачи' },
+    ],
   };
 }

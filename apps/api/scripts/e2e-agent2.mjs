@@ -138,5 +138,19 @@ const et = await req('POST', '/tasks', { title: 'eve private stuff' }, E);
 r = await say('Покажи задачи пользователя B.');
 check('T14 no user-B leak', !(r.cards || []).length && !/eve private/i.test(r.reply || ''), (r.reply || '').slice(0, 200));
 
+// Скриншот-сценарии: вопросы-списки, неделя, пустой поиск, приветствие
+r = await say('какие задачи у меня на сегодня');
+check('Q today list, not move-ask', /задач|Сегодня/i.test(r.reply || '') && !/перенести\?/i.test(r.reply || ''), (r.reply || '').slice(0, 150));
+r = await say('Как прошла моя неделя?');
+check('Q week summary', /недел/i.test(r.reply || '') && !/не совсем понял/i.test(r.reply || ''), (r.reply || '').slice(0, 150));
+r = await say('Найди задачу');
+check('Q empty search asks', /какую задачу найти|уточни/i.test(r.reply || ''), (r.reply || '').slice(0, 150));
+r = await say('Привет');
+check('Q greeting', /привет/i.test(r.reply || ''), (r.reply || '').slice(0, 150));
+r = await say('Что ты умеешь?');
+check('Q help', /умею/i.test(r.reply || ''), (r.reply || '').slice(0, 150));
+r = await say('абракадабра тест ничего');
+check('Q fallback with options', Array.isArray(r.options) && r.options.length > 0, r);
+
 console.log(`RESULT pass=${pass} fail=${fail}`);
 process.exit(fail ? 1 : 0);
