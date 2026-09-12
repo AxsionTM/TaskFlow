@@ -36,6 +36,8 @@ const MOBILE_TITLES: Record<string, string> = {
   pulse: 'Пульс',
   trash: 'Корзина',
   profile: 'Профиль',
+  notes: 'Заметки',
+  assistant: 'AI Ассистент',
 };
 
 function mobileDateLabel(): string {

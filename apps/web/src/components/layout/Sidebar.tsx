@@ -23,6 +23,7 @@ import {
   Flame,
   Gift,
   StickyNote,
+  Bot,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
 import { useProjectsStore } from '@/stores/projects';
@@ -343,6 +344,18 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               active={currentView === 'focus'}
               onClick={() => handleViewClick('focus')}
             />
+            <button
+              onClick={() => handleViewClick('assistant')}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                currentView === 'assistant'
+                  ? 'tf-nav-active'
+                  : 'text-foreground hover:bg-accent'
+              )}
+            >
+              <Bot className="h-4 w-4" />
+              AI Ассистент
+            </button>
             <button
               onClick={() => handleViewClick('notes')}
               className={cn(

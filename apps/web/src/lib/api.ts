@@ -534,6 +534,44 @@ class ApiClient {
     return this.request<{ maintenance: { enabled: boolean; message: string } }>('/auth/system/status');
   }
 
+  // --- AI Agent ---
+  agentChat(data: { conversationId?: string; message: string; timezone?: string; clientNowISO?: string }) {
+    return this.request<{
+      reply: string;
+      steps: { label: string; status: string }[];
+      cards: any[];
+      options?: { key: string; label: string; sub?: string }[];
+      confirm?: { token: string; summary: string; kind: string };
+      conversationId: string;
+    }>('/agent/chat', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  agentConfirm(conversationId: string, token: string, approved: boolean) {
+    return this.request<{ reply: string; steps: any[]; cards: any[] }>('/agent/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ conversationId, token, approved }),
+    });
+  }
+
+  agentConversations() {
+    return this.request<{ conversations: any[]; llm: boolean }>('/agent/conversations');
+  }
+
+  agentMessages(conversationId: string) {
+    return this.request<{ messages: any[] }>(`/agent/conversations/${conversationId}/messages`);
+  }
+
+  agentDeleteConversation(conversationId: string) {
+    return this.request<{ ok: boolean }>(`/agent/conversations/${conversationId}`, { method: 'DELETE' });
+  }
+
+  agentRenameConversation(conversationId: string, title: string) {
+    return this.request<{ conversation: any }>(`/agent/conversations/${conversationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    });
+  }
+
   // --- User notifications (серверные, переживают refresh) ---
   getNotifications(limit = 20, unreadOnly = false) {
     const q = new URLSearchParams({ limit: String(limit) });

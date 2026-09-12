@@ -9,6 +9,7 @@
     "test:notes": "tsx scripts/e2e-notes.mjs",
     "test:security": "tsx scripts/e2e-security.mjs",
     "test:notifmaint": "tsx scripts/e2e-notif-maint.mjs",
+    "test:agent": "tsx scripts/e2e-agent.mjs",
     "start": "node dist/main.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma db push",

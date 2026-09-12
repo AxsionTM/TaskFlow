@@ -187,6 +187,49 @@ model Note {
   @@map("notes")
 }
 
+// AI Agent: разговоры, сообщения, вызовы инструментов.
+// Контекст (lastTaskId, кандидаты выбора, pending confirm) — в context JSON.
+model AIConversation {
+  id        String      @id @default(cuid())
+  userId    String
+  title     String      @default("Новый чат")
+  context   String      @default("{}")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  messages  AIMessage[]
+  toolCalls AIToolCall[]
+
+  @@index([userId, updatedAt])
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  role           String
+  content        String
+  cards          String?
+  createdAt      DateTime       @default(now())
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+model AIToolCall {
+  id             String         @id @default(cuid())
+  conversationId String
+  toolName       String
+  args           String         @default("{}")
+  status         String         @default("ok")
+  resultSummary  String?
+  createdAt      DateTime       @default(now())
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_tool_calls")
+}
+
 // Реестр ошибок приложения для Error Center (только 5xx, без секретов).
 model ErrorLog {
   id         String   @id @default(cuid())
