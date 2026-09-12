@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTheme } from 'next-themes';
 import { SearchDialog } from './SearchDialog';
+import { NotificationCenter } from '@/components/NotificationCenter';
 
 const smartViews = [
   { id: 'today', label: 'Сегодня', icon: CalendarCheck },
@@ -168,7 +169,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
       )}>
         <div className="flex items-center gap-2 px-4 py-3 border-b">
           <Logo size={32} />
-          <span className="font-semibold text-sm">TaskFlow</span>
+          <span className="flex-1 font-semibold text-sm">TaskFlow</span>
+          <NotificationCenter />
         </div>
 
         <div className="px-3 py-2">

@@ -129,7 +129,7 @@ export function AdminPanel() {
   );
 
   return (
-    <div className="flex min-h-screen bg-[#070a12] text-white">
+    <div className="tf-admin flex min-h-screen bg-[#070a12] text-white">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-white/[0.07] bg-[#0a0f1e] lg:block">
         {nav}
       </aside>

@@ -518,6 +518,25 @@ class ApiClient {
     return this.request<{ maintenance: { enabled: boolean; message: string } }>('/auth/system/status');
   }
 
+  // --- User notifications (серверные, переживают refresh) ---
+  getNotifications(limit = 20, unreadOnly = false) {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (unreadOnly) q.set('unreadOnly', 'true');
+    return this.request<{ notifications: any[] }>(`/notifications?${q.toString()}`);
+  }
+
+  getUnreadCount() {
+    return this.request<{ count: number }>('/notifications/unread-count');
+  }
+
+  markNotificationRead(id: string) {
+    return this.request<{ notification: any }>(`/notifications/${id}/read`, { method: 'PATCH' });
+  }
+
+  markAllNotificationsRead() {
+    return this.request<{ ok: boolean; marked: number }>('/notifications/read-all', { method: 'POST' });
+  }
+
   // --- Notes (одна задача = максимум одна заметка) ---
   getNotes() {
     return this.request<{

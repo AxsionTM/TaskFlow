@@ -1664,3 +1664,48 @@ body::before {
     padding: 3px;
   }
 }
+
+/* ===== Admin panel: всегда тёмная тема TaskFlow ===== */
+/* Независимо от пользовательской темы: глубокий navy фон, тёмные
+   карточки, тонкие borders, violet акцент. */
+.tf-admin {
+  --background: 222 47% 4%;
+  --foreground: 210 40% 98%;
+  --card: 222 40% 8%;
+  --card-foreground: 210 40% 98%;
+  --primary: 262 83% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 222 30% 12%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 222 28% 13%;
+  --muted-foreground: 215 20% 62%;
+  --accent: 222 30% 14%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 222 28% 16%;
+  --input: 222 28% 16%;
+  --ring: 262 83% 62%;
+  --tf-glow: rgba(139, 92, 246, 0.4);
+  --tf-accent2: #a78bfa;
+  color-scheme: dark;
+  background-color: #070a12;
+}
+.tf-admin input,
+.tf-admin textarea,
+.tf-admin select {
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+.tf-admin input::placeholder,
+.tf-admin textarea::placeholder {
+  color: hsl(var(--muted-foreground) / 0.7);
+}
+.tf-admin input:focus,
+.tf-admin textarea:focus,
+.tf-admin select:focus {
+  border-color: hsl(var(--primary) / 0.7);
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2), 0 0 16px -4px var(--tf-glow);
+  outline: none;
+}

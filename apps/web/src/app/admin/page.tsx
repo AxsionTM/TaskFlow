@@ -23,7 +23,7 @@ export default function AdminPage() {
 
   if (isLoading || !isAuthenticated) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#070a12]">
+      <div className="tf-admin flex h-screen items-center justify-center bg-[#070a12]">
         <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
       </div>
     );
@@ -33,7 +33,7 @@ export default function AdminPage() {
   // на backend в каждом /admin/* endpoint (requireAdmin).
   if (user && user.role !== 'ADMIN') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#070a12] p-6 text-center text-white">
+      <div className="tf-admin flex min-h-screen flex-col items-center justify-center gap-4 bg-[#070a12] p-6 text-center text-white">
         <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-red-500/30 bg-red-500/10 text-red-400">
           <ShieldAlert className="h-7 w-7" />
         </span>

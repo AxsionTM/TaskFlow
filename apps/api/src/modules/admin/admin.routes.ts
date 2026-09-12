@@ -1301,6 +1301,7 @@ router.get('/system/maintenance', async (_req, res, next) => {
   try {
     const row = await prisma.systemSetting.findUnique({ where: { key: 'MAINTENANCE_MODE' } });
     const parsed = row ? (JSON.parse(row.value) as { enabled?: boolean; message?: string }) : null;
+    res.set('Cache-Control', 'no-store');
     res.json({ enabled: Boolean(parsed?.enabled), message: parsed?.message || '' });
   } catch (err) {
     next(err);

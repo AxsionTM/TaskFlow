@@ -15,7 +15,9 @@ import { GlobalQuickAdd } from '@/components/GlobalQuickAdd';
 import { ReminderWorker } from '@/components/ReminderWorker';
 import { MobileNav } from '@/components/mobile/MobileNav';
 import { MobileMoreMenu } from '@/components/mobile/MobileMoreMenu';
-import { Loader2, Menu, X, Wrench } from 'lucide-react';
+import { NotificationCenter } from '@/components/NotificationCenter';
+import { api } from '@/lib/api';
+import { Loader2, Menu, X, Wrench, Heart } from 'lucide-react';
 
 const MOBILE_TITLES: Record<string, string> = {
   today: 'Сегодня',
@@ -54,6 +56,24 @@ export default function AppPage() {
     checkAuth();
   }, [checkAuth]);
 
+  // Независимая проверка техрежима напрямую с backend (не только через /me):
+  // переживает кэши инстансов и срабатывает сразу после refresh.
+  useEffect(() => {
+    let alive = true;
+    api
+      .systemStatus()
+      .then((s) => {
+        if (!alive) return;
+        if (s.maintenance.enabled) {
+          useAuthStore.setState({ maintenance: { message: s.maintenance.message } });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace('/login');
@@ -72,13 +92,34 @@ export default function AppPage() {
   // этот экран, администраторы продолжают работать (их запросы не блокируются).
   if (maintenance && user?.role !== 'ADMIN') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#070a12] p-6 text-center text-white">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
-          <Wrench className="h-7 w-7" />
-        </span>
-        <h1 className="text-xl font-bold">Техническое обслуживание</h1>
-        <p className="max-w-sm text-sm text-slate-400">{maintenance.message}</p>
-        <p className="text-xs text-slate-600">TaskFlow скоро вернётся в работу.</p>
+      <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#070a12] p-6 text-center text-white">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_30%,rgba(139,92,246,.14),transparent_55%),radial-gradient(ellipse_at_50%_110%,rgba(59,130,246,.1),transparent_55%)]" />
+        <div className="relative flex w-full max-w-md flex-col items-center rounded-3xl border border-white/[0.07] bg-white/[0.02] px-6 py-10 backdrop-blur">
+          <span className="flex h-16 w-16 items-center justify-center rounded-3xl border border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_32px_-8px_rgba(245,158,11,.5)]">
+            <Wrench className="h-8 w-8" />
+          </span>
+          <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-300">
+            Технические работы
+          </p>
+          <h1 className="mt-2 text-2xl font-black tracking-tight">Сайт временно недоступен</h1>
+          <p className="mt-3 max-w-sm text-sm leading-6 text-slate-400">
+            Сейчас мы проводим технические работы, чтобы сделать TaskFlow ещё лучше.
+          </p>
+          <div className="mt-4 w-full rounded-2xl border border-amber-500/25 bg-amber-500/[0.07] px-4 py-3 text-sm leading-6 text-amber-200">
+            {maintenance.message}
+          </div>
+          <p className="mt-4 text-xs leading-5 text-slate-500">
+            Пожалуйста, попробуйте зайти немного позже.
+            <br />
+            Приносим свои извинения за временные неудобства.
+          </p>
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+            Спасибо за понимание <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" />
+          </p>
+          <div className="mt-6 border-t border-white/[0.07] pt-4 text-xs text-slate-600">
+            <span className="font-bold text-slate-300">TaskFlow</span> · Мы скоро вернёмся.
+          </div>
+        </div>
       </div>
     );
   }
@@ -116,6 +157,7 @@ export default function AppPage() {
               {mobileDateLabel()}
             </div>
           </div>
+          <NotificationCenter />
           <button
             type="button"
             onClick={goProfile}

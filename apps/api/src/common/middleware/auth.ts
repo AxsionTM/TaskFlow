@@ -9,8 +9,9 @@ export interface AuthRequest extends Request {
 }
 
 // Кэш maintenance-флага, чтобы не ходить в БД на каждый запрос.
+// TTL короткий: включение в админке видно пользователям за секунды.
 let maintenanceCache: { value: boolean; message: string; at: number } | null = null;
-const MAINTENANCE_CACHE_TTL = 15000;
+const MAINTENANCE_CACHE_TTL = 5000;
 
 export async function isMaintenanceOn(): Promise<{ enabled: boolean; message: string }> {
   const now = Date.now();

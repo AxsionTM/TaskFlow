@@ -124,10 +124,12 @@ async function findOrCreateOAuthUser(params: {
 
 // Публичный статус обслуживания: нужен пользовательской части,
 // чтобы показать maintenance-экран до/без авторизации.
+// no-store: CDN/браузер не должны отдавать stale-статус после переключения.
 router.get('/system/status', async (_req, res, next) => {
   try {
     const row = await prisma.systemSetting.findUnique({ where: { key: 'MAINTENANCE_MODE' } });
     const parsed = row ? (JSON.parse(row.value) as { enabled?: boolean; message?: string }) : null;
+    res.set('Cache-Control', 'no-store');
     res.json({
       maintenance: {
         enabled: Boolean(parsed?.enabled),

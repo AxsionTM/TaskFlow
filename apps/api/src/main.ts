@@ -19,6 +19,7 @@ import { exportRouter } from "./modules/export/export.routes";
 import { birthdaysRouter } from "./modules/birthdays/birthdays.routes";
 import { graphRouter } from "./modules/graph.routes";
 import { notesRouter } from "./modules/notes/notes.routes";
+import { notificationsRouter } from "./modules/notifications/notifications.routes";
 import { adminRouter } from "./modules/admin/admin.routes";
 import { errorHandler } from "./common/middleware/error-handler";
 import { authMiddleware } from "./common/middleware/auth";
@@ -170,6 +171,7 @@ app.use("/export", authMiddleware, exportLimiter, exportRouter);
 app.use("/birthdays", authMiddleware, writeLimiter, birthdaysRouter);
 app.use("/graph", authMiddleware, graphRouter);
 app.use("/notes", authMiddleware, writeLimiter, notesRouter);
+app.use("/notifications", authMiddleware, notificationsRouter);
 app.use("/admin", adminLimiter, adminRouter);
 
 app.use(errorHandler);

@@ -3,8 +3,9 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Check, Loader2, LockKeyhole } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, LockKeyhole, Wrench } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -16,6 +17,21 @@ function LoginContent() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [maintenanceMsg, setMaintenanceMsg] = useState('');
+
+  // Баннер техрежима: вход (особенно админу) остаётся доступен.
+  useEffect(() => {
+    let alive = true;
+    api
+      .systemStatus()
+      .then((s) => {
+        if (alive && s.maintenance.enabled) setMaintenanceMsg(s.maintenance.message);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const err = searchParams.get('error');
@@ -79,6 +95,12 @@ function LoginContent() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {maintenanceMsg && (
+                <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-3.5 py-3 text-sm text-amber-200">
+                  <Wrench className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>Технические работы: {maintenanceMsg}</span>
+                </div>
+              )}
               {error && <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-3 text-sm text-red-300">{error}</div>}
 
               <div className="space-y-2">
