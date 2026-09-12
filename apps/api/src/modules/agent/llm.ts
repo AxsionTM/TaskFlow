@@ -1,9 +1,3 @@
-/**
- * LLM-клиент: OpenAI-совместимый Chat Completions endpoint.
- * Ключ и URL — только env backend, никогда не уходят во frontend и в LLM
- * не передаётся ничего кроме данных текущего пользователя и его сообщения.
- * Без ключа движок работает в детерминированном rule-based режиме.
- */
 
 const TIMEOUT_MS = 30000;
 
@@ -35,9 +29,6 @@ export interface LlmResult {
   toolCalls: LlmToolCall[];
 }
 
-/**
- * Один шаг chat completions с tools. Возвращает текст и вызовы инструментов.
- */
 export async function chatWithTools(
   messages: LlmMessage[],
   tools: LlmToolDef[],
@@ -105,7 +96,6 @@ export async function chatWithTools(
   }
 }
 
-/** Простой текстовый вызов без tools (перефразирование, исправление текста). */
 export async function chatText(system: string, user: string, maxTokens = 800): Promise<string> {
   const r = await chatWithTools(
     [

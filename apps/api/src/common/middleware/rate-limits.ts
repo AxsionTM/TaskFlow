@@ -1,11 +1,5 @@
 import rateLimit from 'express-rate-limit';
 
-/**
- * Per-route лимиты поверх глобального (500/15мин).
- * Используется стандартный IP-ключ лимитера (корректен для IPv6 из коробки).
- * На Vercel (serverless) MemoryStore работает в пределах инстанса —
- * это базовая защита, а не распределённый лимит (документировано).
- */
 function tooMany(req: unknown, res: any) {
   void req;
   res.status(429).json({
@@ -13,7 +7,6 @@ function tooMany(req: unknown, res: any) {
   });
 }
 
-/** Логин/регистрация: жёстко против брутфорса и спама. Успешные не считаются. */
 export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -33,7 +26,6 @@ export const registerLimiter = rateLimit({
   handler: tooMany,
 });
 
-/** AI: дорого и нагружает внешний сервис. */
 export const aiLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 60,
@@ -43,7 +35,6 @@ export const aiLimiter = rateLimit({
   handler: tooMany,
 });
 
-/** Массовые записи (задачи/проекты/заметки/привычки/цели/теги). */
 export const writeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 300,
@@ -53,7 +44,6 @@ export const writeLimiter = rateLimit({
   handler: tooMany,
 });
 
-/** Экспорт: тяжёлые выборки. */
 export const exportLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 20,
@@ -63,7 +53,6 @@ export const exportLimiter = rateLimit({
   handler: tooMany,
 });
 
-/** Импорт: тяжёлый парсинг + массовая запись. */
 export const importLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
@@ -73,7 +62,6 @@ export const importLimiter = rateLimit({
   handler: tooMany,
 });
 
-/** Админка: редкие, но пачками (таблицы с пагинацией). */
 export const adminLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 600,

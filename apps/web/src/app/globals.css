@@ -248,7 +248,7 @@ html.theme-violet body {
   100% { background-position: 300% 0%; }
 }
 
-/* Hover glow — only when effects are on */
+/* Hover glow вЂ” only when effects are on */
 html.effects-on aside button,
 html.effects-on aside a,
 html.effects-on main button,
@@ -359,7 +359,7 @@ body {
 }
 
 @media (max-width: 767px) {
-  /* Mobile perf: фон не fixed (дорого на телефонах), меньше blur, тише тени. */
+  /* Mobile perf: no fixed background, less blur, softer shadows. */
   body::before {
     background-attachment: scroll;
   }
@@ -847,7 +847,7 @@ html.theme-black {
   --ring: 217 91% 60%;
   --heatmap-empty: #171717;
   --heatmap-empty-border: #262626;
-  /* Без фоновой картинки: чистый чёрный + лёгкие статичные градиенты */
+  /* No background image: pure black plus light static gradients */
   --tf-bg-image: none;
   --tf-veil: linear-gradient(180deg, rgba(0, 0, 0, 0.0), rgba(0, 0, 0, 0.0));
   --tf-bg-layers:
@@ -864,7 +864,7 @@ html.theme-black body::before {
   background-image: var(--tf-bg-layers);
   background-size: auto;
 }
-/* В чёрной теме — минимум blur и лёгкие тени ради производительности */
+/* Black theme keeps blur and shadows minimal for performance */
 html.theme-black .tf-glass {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -885,8 +885,8 @@ html.theme-violet {
   --tf-accent2: #e9d5ff;
 }
 
-/* Живые обои темы под всем приложением. Если файла /themes/<id>.png нет —
-   слой просто не рисуется, остаются градиенты. */
+/* Р–РёРІС‹Рµ РѕР±РѕРё С‚РµРјС‹ РїРѕРґ РІСЃРµРј РїСЂРёР»РѕР¶РµРЅРёРµРј. Р•СЃР»Рё С„Р°Р№Р»Р° /themes/<id>.png РЅРµС‚ вЂ”
+   СЃР»РѕР№ РїСЂРѕСЃС‚Рѕ РЅРµ СЂРёСЃСѓРµС‚СЃСЏ, РѕСЃС‚Р°СЋС‚СЃСЏ РіСЂР°РґРёРµРЅС‚С‹. */
 body::before {
   content: '';
   position: fixed;
@@ -899,7 +899,7 @@ body::before {
   background-attachment: fixed;
 }
 
-/* Стеклянные панели поверх обоев — только десктоп, мобильную верстку не трогаем */
+/* Glass panels over wallpaper, desktop only */
 @media (min-width: 1024px) {
   .app-shell > .app-sidebar {
     background-color: hsl(var(--card) / 0.68) !important;
@@ -920,7 +920,7 @@ body::before {
   }
 }
 
-/* Активный пункт меню — фиолетовый градиент как в дизайне */
+/* Active nav item, violet gradient */
 .tf-nav-active {
   background: linear-gradient(92deg, hsl(var(--primary) / 0.95), hsl(var(--primary) / 0.5)) !important;
   color: #fff !important;
@@ -933,7 +933,7 @@ body::before {
   color: #fff !important;
 }
 
-/* Стеклянная карточка */
+/* Glass card */
 .tf-glass {
   background: hsl(var(--card) / 0.62);
   backdrop-filter: blur(16px);
@@ -944,7 +944,7 @@ body::before {
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* Горячая кнопка Старт — розово-фиолетовый градиент */
+/* Hot Start button, pink-violet gradient */
 .tf-btn-hot {
   background: linear-gradient(135deg, #ff2e63 0%, #f43f5e 45%, #c026d3 100%) !important;
   color: #fff !important;
@@ -962,7 +962,7 @@ body::before {
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-/* Фиолетовая кнопка Добавить */
+/* Violet Add button */
 .tf-btn-violet {
   background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%) !important;
   color: #fff !important;
@@ -975,7 +975,7 @@ body::before {
   filter: brightness(1.12);
 }
 
-/* Чипы пресетов фокуса */
+/* Focus preset chips */
 .tf-chip {
   border: 1px solid hsl(var(--primary) / 0.3);
   background: hsl(var(--card) / 0.6);
@@ -990,7 +990,7 @@ body::before {
   box-shadow: 0 4px 18px -4px var(--tf-glow);
 }
 
-/* Цветной тег-пилюля с неоновым свечением */
+/* Colored neon tag pill */
 .tf-tag {
   border-radius: 999px;
   font-size: 10px;
@@ -1000,7 +1000,7 @@ body::before {
   white-space: nowrap;
 }
 
-/* Выбранная задача в списке */
+/* Selected task in list */
 .tf-task-active {
   background: linear-gradient(90deg, hsl(var(--primary) / 0.22), hsl(var(--primary) / 0.07)) !important;
   box-shadow:
@@ -1008,19 +1008,19 @@ body::before {
     0 0 18px -6px var(--tf-glow);
 }
 
-/* Неоновые круги чекбоксов */
+/* Neon checkbox rings */
 .tf-check-glow[data-checked] {
   box-shadow: 0 0 12px -1px var(--tf-glow);
 }
 
-/* Свечение кольца фокус-таймера */
+/* Focus timer ring glow */
 .tf-focus-ring {
   filter:
     drop-shadow(0 0 14px hsl(var(--primary) / 0.55))
     drop-shadow(0 0 44px hsl(var(--primary) / 0.22));
 }
 
-/* Карточка темы с обоями */
+/* Theme card with wallpaper */
 .tf-theme-card {
   background-size: cover;
   background-position: center;
@@ -1378,27 +1378,27 @@ body::before {
 }
 
 /* ===== TaskFlow mobile design system (reference mockup, phone only) ===== */
-/* Системный safe-механизм от перекрытия нижней навигацией:
-   --mobile-bottom-nav-height = реальная высота панели (кнопки 52px +
-   отступы + safe-area). Все прокручиваемые области и панели действий
-   получают нижний отступ от этой переменной, а не наугад. */
+/* РЎРёСЃС‚РµРјРЅС‹Р№ safe-РјРµС…Р°РЅРёР·Рј РѕС‚ РїРµСЂРµРєСЂС‹С‚РёСЏ РЅРёР¶РЅРµР№ РЅР°РІРёРіР°С†РёРµР№:
+   --mobile-bottom-nav-height = СЂРµР°Р»СЊРЅР°СЏ РІС‹СЃРѕС‚Р° РїР°РЅРµР»Рё (РєРЅРѕРїРєРё 52px +
+   РѕС‚СЃС‚СѓРїС‹ + safe-area). Р’СЃРµ РїСЂРѕРєСЂСѓС‡РёРІР°РµРјС‹Рµ РѕР±Р»Р°СЃС‚Рё Рё РїР°РЅРµР»Рё РґРµР№СЃС‚РІРёР№
+   РїРѕР»СѓС‡Р°СЋС‚ РЅРёР¶РЅРёР№ РѕС‚СЃС‚СѓРї РѕС‚ СЌС‚РѕР№ РїРµСЂРµРјРµРЅРЅРѕР№, Р° РЅРµ РЅР°СѓРіР°Рґ. */
 :root {
   --mobile-bottom-nav-height: 84px;
 }
 @media (max-width: 1023px) {
-  /* ����� ��� ������ ���������, ����� ������� �� ������ ��� �� */
+  /* Space for the bottom navigation, content never hides under it. * */
   .mobile-main {
     padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom));
   }
 
-  /* Панель деталей задачи: fixed-шит на весь viewport (вне отступа main),
-     поэтому ей нужен собственный safe-отступ — кнопки внизу доступны. */
+  /* РџР°РЅРµР»СЊ РґРµС‚Р°Р»РµР№ Р·Р°РґР°С‡Рё: fixed-С€РёС‚ РЅР° РІРµСЃСЊ viewport (РІРЅРµ РѕС‚СЃС‚СѓРїР° main),
+     РїРѕСЌС‚РѕРјСѓ РµР№ РЅСѓР¶РµРЅ СЃРѕР±СЃС‚РІРµРЅРЅС‹Р№ safe-РѕС‚СЃС‚СѓРї вЂ” РєРЅРѕРїРєРё РІРЅРёР·Сѓ РґРѕСЃС‚СѓРїРЅС‹. */
   .task-detail-panel > .flex-1 {
     padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom));
   }
 
-  /* Панель заметок в потоке main: отступ уже даёт .mobile-main,
-     собственный не нужен (иначе двойная пустая зона под футером). */
+  /* РџР°РЅРµР»СЊ Р·Р°РјРµС‚РѕРє РІ РїРѕС‚РѕРєРµ main: РѕС‚СЃС‚СѓРї СѓР¶Рµ РґР°С‘С‚ .mobile-main,
+     СЃРѕР±СЃС‚РІРµРЅРЅС‹Р№ РЅРµ РЅСѓР¶РµРЅ (РёРЅР°С‡Рµ РґРІРѕР№РЅР°СЏ РїСѓСЃС‚Р°СЏ Р·РѕРЅР° РїРѕРґ С„СѓС‚РµСЂРѕРј). */
 
   /* --- Bottom navigation --- */
   .mobile-bottom-nav {
@@ -1543,10 +1543,10 @@ body::before {
   }
 
   /* --- Create task modal -> bottom sheet ---
-     Причина прошлого перекрытия: z-50 модалки был НИЖЕ мобильной
-     навигации (z-80), а кнопка «Создать» лежала в конце скролла формы.
-     Теперь: модалка выше навигации, шапка и футер зафиксированы,
-     прокручивается только тело. */
+     РџСЂРёС‡РёРЅР° РїСЂРѕС€Р»РѕРіРѕ РїРµСЂРµРєСЂС‹С‚РёСЏ: z-50 РјРѕРґР°Р»РєРё Р±С‹Р» РќР�Р–Р• РјРѕР±РёР»СЊРЅРѕР№
+     РЅР°РІРёРіР°С†РёРё (z-80), Р° РєРЅРѕРїРєР° В«РЎРѕР·РґР°С‚СЊВ» Р»РµР¶Р°Р»Р° РІ РєРѕРЅС†Рµ СЃРєСЂРѕР»Р»Р° С„РѕСЂРјС‹.
+     РўРµРїРµСЂСЊ: РјРѕРґР°Р»РєР° РІС‹С€Рµ РЅР°РІРёРіР°С†РёРё, С€Р°РїРєР° Рё С„СѓС‚РµСЂ Р·Р°С„РёРєСЃРёСЂРѕРІР°РЅС‹,
+     РїСЂРѕРєСЂСѓС‡РёРІР°РµС‚СЃСЏ С‚РѕР»СЊРєРѕ С‚РµР»Рѕ. */
   .tf-create-modal {
     align-items: flex-end;
     padding: 0;
@@ -1588,7 +1588,7 @@ body::before {
     padding-right: 20px;
   }
 
-  /* --- ���������� �������� � ��������� --- */
+  /* --- Compact calendar, swipe inside itself --- * */
   .tf-task-list > div.flex-1 {
     padding-bottom: 8px;
   }
@@ -1596,14 +1596,14 @@ body::before {
     font-size: 1.1rem;
   }
 
-  /* ���������: ���������� ������, ����� ������ ���� */
+  /* Calendar: compact cells, internal scroll only. * */
   .calendar-scroll .tf-glass.rounded-3xl {
     border-radius: 20px;
   }
 
   /* Graph: scrolls the AREA under canvas, not canvas itself.
      Cause: grid was flex-1 min-h-0 without overflow inside
-     overflow-hidden main — lower cards were cut off unreachable.
+     overflow-hidden main вЂ” lower cards were cut off unreachable.
      Canvas keeps touch-pan (touch-none inside). */
   .tf-graph-grid {
     overflow-y: auto;
@@ -1621,7 +1621,7 @@ body::before {
     padding-bottom: 8px;
   }
 
-  /* ������: ���� ������� ~78vw �� snap */
+  /* Kanban: one column ~78vw with snap. * */
   .tf-kanban-scroll {
     scroll-snap-type: x mandatory;
     overscroll-behavior-x: contain;
@@ -1631,13 +1631,13 @@ body::before {
     width: min(78vw, 300px);
   }
 
-  /* �����: ������ ���������� �� �������� */
+  /* Focus: timer fits the phone. * */
   .tf-glass.rounded-3xl .relative.w-64.h-64 {
     width: min(64vw, 240px);
     height: min(64vw, 240px);
   }
 
-  /* ������� ��� ������ �������� � ������ */
+  /* Finger-friendly header controls. * */
   .tf-calendar-toolbar button,
   .tf-task-header button {
     min-height: 36px;
@@ -1665,9 +1665,9 @@ body::before {
   }
 }
 
-/* ===== Admin panel: ������ ����� ���� TaskFlow ===== */
-/* ���������� �� ���������������� ����: �������� navy ���, �����
-   ��������, ������ borders, violet ������. */
+/* ===== Admin panel: always dark TaskFlow theme ===== * */
+/* Независимо от пользовательской темы: глубокий navy фон, тёмные
+   карточки, тонкие borders, violet акцент. */
 .tf-admin {
   --background: 222 47% 4%;
   --foreground: 210 40% 98%;
@@ -1711,9 +1711,9 @@ body::before {
 }
 
 /* ===== Notification dropdown: viewport-safe positioning ===== */
-/* ������� ������� ��������: absolute right-0 ������������ ������-��������,
-   ������� �� ��������� �� � ������� ���� (����� ������) � ������ 360px
-   �������� �� viewport. �� �������� ������ fixed ������������ viewport. */
+/* Причина старого уезжания: absolute right-0 относительно кнопки-колокола,
+   которая на мобильном НЕ у правого края (рядом аватар) — панель 360px
+   вылезала за viewport. На телефоне панель fixed относительно viewport. */
 @media (max-width: 767px) {
   .tf-notif-dropdown {
     position: fixed !important;

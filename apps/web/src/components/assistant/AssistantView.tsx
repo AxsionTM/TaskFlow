@@ -241,7 +241,7 @@ export function AssistantView() {
 
   return (
     <div className="flex min-h-0 flex-1">
-      {/* Чат */}
+      {}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="tf-view-header flex shrink-0 items-center gap-2 border-b px-3 py-2.5 sm:px-4">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-500 text-white shadow-[0_0_18px_-4px_rgba(139,92,246,.7)]">
@@ -377,7 +377,7 @@ export function AssistantView() {
           </div>
         </div>
 
-        {/* Быстрые действия (mobile chips) */}
+        {}
         <div className="tf-assistant-quick shrink-0 border-t border-border/40 px-3 pt-2 lg:hidden">
           <div className="flex gap-1.5 overflow-x-auto pb-1">
             {QUICK.map((q) => (
@@ -424,7 +424,7 @@ export function AssistantView() {
         </div>
       </div>
 
-      {/* Правая панель (desktop) */}
+      {}
       <div className="hidden w-[260px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-border/50 p-3 xl:flex">
         <div className="rounded-2xl border border-border/50 bg-card/50 p-3">
           <div className="mb-2 text-xs font-bold text-muted-foreground">БЫСТРЫЕ ДЕЙСТВИЯ</div>
@@ -501,7 +501,7 @@ export function AssistantView() {
         </div>
       </div>
 
-      {/* История (mobile sheet) */}
+      {}
       {historyOpen && (
         <div className="fixed inset-0 z-[110] lg:hidden" role="dialog" aria-modal="true">
           <button type="button" aria-label="Закрыть" className="absolute inset-0 bg-black/60" onClick={() => setHistoryOpen(false)} />
@@ -534,7 +534,7 @@ export function AssistantView() {
         </div>
       )}
 
-      {/* Контекст (mobile/tablet drawer) */}
+      {}
       {contextOpen && (
         <div className="fixed inset-0 z-[110] xl:hidden" role="dialog" aria-modal="true">
           <button type="button" aria-label="Закрыть" className="absolute inset-0 bg-black/60" onClick={() => setContextOpen(false)} />

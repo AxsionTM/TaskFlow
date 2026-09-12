@@ -113,7 +113,6 @@ async function executeOps(
   return { ok, failed };
 }
 
-/** LLM-путь с перехватом опасных вызовов в confirm. */
 async function runLlmTurn(
   userId: string,
   conversationId: string,
@@ -202,7 +201,6 @@ router.post('/chat', async (req: AuthRequest, res, next) => {
   try {
     const data = z
       .object({
-        // nullish: клиенты иногда шлют явный null для "нового чата"
         conversationId: z.string().max(64).nullish(),
         message: z.string().min(1).max(4000),
         timezone: z.string().max(64).optional(),
@@ -263,8 +261,6 @@ router.post('/chat', async (req: AuthRequest, res, next) => {
         ctxJson.lastTaskId = out.lastTaskId;
         ctxJson.lastTaskTitle = out.lastTaskTitle ?? null;
       }
-      // Кандидаты выбора живут в контексте до следующего хода.
-      // Подсказки fallback (ключи o1..o3) — не кандидаты, их не запоминаем.
       if (options?.length && !options.every((o) => /^o\d+$/.test(o.key))) {
         ctxJson.pendingChoice = { candidates: options.map((o) => ({ id: o.key, title: o.label, sub: o.sub })) };
       } else {

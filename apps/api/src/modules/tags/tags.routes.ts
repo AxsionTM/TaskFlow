@@ -18,7 +18,6 @@ const DEFAULT_TAGS = [
 const TAG_PALETTE = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#22d3ee', '#fb7185'];
 
 async function ensureDefaultTags(userId: string) {
-  // Досеиваем недостающие базовые теги даже старым пользователям.
   for (const t of DEFAULT_TAGS) {
     const existing = await prisma.tag.findFirst({ where: { userId, name: t.name } });
     if (!existing) {

@@ -18,7 +18,6 @@ interface NotesState {
   notes: NotePreview[];
   isLoading: boolean;
   selectedNoteId: string | null;
-  /** Открыть редактор для задачи (кнопка «Заметка» в TaskDetail). */
   pendingTask: PendingTaskNote | null;
   fetchNotes: (opts?: { silent?: boolean }) => Promise<void>;
   setSelectedNote: (id: string | null) => void;
@@ -78,7 +77,6 @@ export const useNotesStore = create<NotesState>((set) => ({
       if (idx >= 0) {
         const next = [...s.notes];
         next[idx] = p;
-        // Свежая заметка — наверх, как в backend-сортировке.
         next.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
         return { notes: next };
       }

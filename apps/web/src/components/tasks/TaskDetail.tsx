@@ -114,10 +114,6 @@ export function TaskDetail() {
     loadTask();
   }, [loadTask]);
 
-  // Описание растет вместе с текстом вместо 3 строк со скроллом.
-  // task/loading в зависимостях: при повторном открытии той же задачи
-  // description не меняется, и без этого ресайз не перезапускается,
-  // а поле монтируется маленьким (баг из графа).
   useEffect(() => {
     const el = descRef.current;
     if (!el || loading || !task) return;

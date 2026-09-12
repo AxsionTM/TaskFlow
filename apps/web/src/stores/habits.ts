@@ -41,7 +41,6 @@ export const useHabitsStore = create<HabitsState>((set, get) => ({
 
   createHabit: async (data) => {
     const { habit } = await api.createHabit(data);
-    // Optimistic: видно сразу, затем тихая сверка с сервером.
     set((state) => ({ habits: [habit, ...state.habits] }));
     await get().fetchHabits().catch(() => {});
     return habit;
@@ -74,7 +73,6 @@ export const useHabitsStore = create<HabitsState>((set, get) => ({
   toggleToday: async (id) => {
     const habit = get().habits.find((h) => h.id === id);
     if (!habit) return;
-    // Optimistic toggle для мгновенного отклика на mobile.
     set((state) => ({
       habits: state.habits.map((h) =>
         h.id === id ? { ...h, completedToday: !h.completedToday } : h

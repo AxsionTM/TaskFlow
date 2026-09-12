@@ -20,9 +20,7 @@ interface AuthState {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  /** email ожидает подтверждения после register/login */
   pendingVerificationEmail: string | null;
-  /** Maintenance mode: показывается полноэкранное уведомление */
   maintenance: { message: string } | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string, turnstileToken?: string) => Promise<{ email: string; devCode?: string }>;
@@ -59,7 +57,6 @@ export const useAuthStore = create<AuthState>((set) => ({
           set({ maintenance: { message: err.message } });
         }
       }
-      // Почта не подтверждена → ведём на страницу ввода кода, сессию не создаём.
       if (
         err instanceof ApiError &&
         (err.status === 403 || (err as any)?.code === 'EMAIL_NOT_VERIFIED')
@@ -72,7 +69,6 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   register: async (email, password, name, turnstileToken) => {
     const res = await api.register({ email, password, confirmPassword: password, name, turnstileToken });
-    // Токен до подтверждения не выдаётся — только pending email.
     set({ pendingVerificationEmail: res.email });
     return { email: res.email, devCode: res.devCode };
   },
@@ -124,7 +120,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { user } = await api.me();
       set({ user, token, isAuthenticated: true, isLoading: false, maintenance: null });
     } catch (err) {
-      // Maintenance: показываем экран обслуживания вместо приложения.
       if (err instanceof ApiError && err.code === 'MAINTENANCE') {
         try {
           const s = await api.systemStatus();

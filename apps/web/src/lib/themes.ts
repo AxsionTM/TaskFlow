@@ -18,11 +18,8 @@ export interface AppTheme {
     primary: string;
     accent: string;
   };
-  /** CSS-сцена-заглушка, пока грузится картинка */
   previewScene: string;
-  /** Большие обои темы: apps/web/public/themes/<id>.png */
   bgImage: string;
-  /** Миниатюра для выбора темы: apps/web/public/themes/mini/<id>.png */
   previewImage: string;
 }
 
@@ -93,7 +90,6 @@ export const APP_THEMES: AppTheme[] = [
     description: 'Чистый чёрный',
     preview: { bg: '#000000', sidebar: '#0a0a0a', primary: '#e5e5e5', accent: '#3b82f6' },
     previewScene: 'linear-gradient(180deg, #050505 0%, #000000 60%, #0a0a0a 100%)',
-    // Без фоновой картинки: чистый чёрный фон, лёгкие CSS-градиенты выше.
     bgImage: '',
     previewImage: '',
   },

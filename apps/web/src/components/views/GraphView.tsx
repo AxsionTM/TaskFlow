@@ -22,7 +22,6 @@ const PRIORITY_LABEL: Record<string, string> = {
   NONE: 'Без приоритета',
 };
 
-/** Кольцевая диаграмма приоритетов — сегменты из реальных долей задач. */
 function PriorityDonut({ byPriority, total }: { byPriority: Record<string, number>; total: number }) {
   const R = 40;
   const C = 2 * Math.PI * R;
@@ -109,7 +108,6 @@ export function GraphView() {
   const taskNodes = useMemo(() => nodes.filter((n) => n.type === 'task'), [nodes]);
   const dayCount = useMemo(() => nodes.filter((n) => n.type === 'date').length, [nodes]);
 
-  /** Задачи выбранного дня (корни + подзадачи, у которых есть dateKeys дня). */
   const dayTasks = useMemo(() => {
     if (!selectedDay) return null;
     const key = selectedDay.dateKey;
@@ -118,7 +116,6 @@ export function GraphView() {
     );
   }, [taskNodes, selectedDay]);
 
-  /** Статистика по набору задач: всё из реальных узлов, без хардкода. */
   const scopedStats = useMemo(() => {
     const list = dayTasks ?? taskNodes;
     const byPriority: Record<string, number> = { HIGH: 0, MEDIUM: 0, LOW: 0, NONE: 0 };
@@ -305,7 +302,7 @@ export function GraphView() {
           </div>
         </div>
 
-        {/* Выбранный день — под статистикой справа, а не поверх графа */}
+        {}
         <div className="tf-glass h-fit min-w-0 rounded-3xl p-4">
           <div className="flex items-start gap-2.5">
             {selectedDay ? (

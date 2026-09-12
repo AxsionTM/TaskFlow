@@ -267,9 +267,6 @@ export default function HomePage() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
 
-  // Если уже вошли — сразу в приложение, а не на лендинг.
-  // Токен живет в localStorage конкретного домена, поэтому важно
-  // открывать один и тот же канонический URL (без www / превью-доменов).
   useEffect(() => {
     try {
       if (localStorage.getItem('token')) router.replace('/app');

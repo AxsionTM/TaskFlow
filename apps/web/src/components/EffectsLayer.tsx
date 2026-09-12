@@ -18,7 +18,6 @@ export function EffectsLayer() {
   useEffect(() => {
     initEffectsFromStorage();
     setMounted(true);
-    // Mobile: вдвое меньше частиц — главный источник лагов на телефонах.
     const isMobile =
       typeof window !== 'undefined' &&
       (window.matchMedia('(max-width: 767px)').matches ||
@@ -59,7 +58,6 @@ export function EffectsLayer() {
 
   const t = theme || resolvedTheme || 'dark';
 
-  // Classic Black: без анимированных частиц — только статичная виньетка.
   if (t === 'black') {
     return (
       <div className="pointer-events-none fixed inset-0 z-[5] overflow-hidden" aria-hidden>

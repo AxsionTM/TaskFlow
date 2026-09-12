@@ -29,7 +29,6 @@ function toIso(date: string, time: string) {
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** Дата YYYY-MM-DD для предзаполнения срока (календарь, повестка) */
   initialDate?: string;
 }
 
@@ -67,7 +66,6 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
     api.getTags().then(({ tags: t }) => setTags(t)).catch(() => {});
   }, [open, currentProjectId, fetchProjects, initialDate]);
 
-  // Поле описания растет вместе с текстом вместо 2 строк со скроллом.
   useEffect(() => {
     const el = descRef.current;
     if (!el) return;
@@ -137,8 +135,6 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
     try {
       let startIso = toIso(startDate, startTime);
       let dueIso = toIso(dueDate, dueTime || (dueDate && startTime ? startTime : ''));
-      // Если время не указали — стартуем прямо сейчас (+1 час на выполнение),
-      // чтобы задача не падала холостой во Входящие.
       const autoDates = !startIso && !dueIso;
       if (autoDates) {
         const now = new Date();
@@ -160,7 +156,6 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
         data.remindRepeatMinutes = Number(remindRepeat);
       }
 
-      // Автодаты не проверяем на пересечения — они служебные.
       if (startIso && dueIso && !autoDates) {
         try {
           const { tasks: existing } = await api.getTasks({ includeCompleted: 'false' });

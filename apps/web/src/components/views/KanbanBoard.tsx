@@ -38,7 +38,6 @@ const PRIORITY_DOT: Record<string, string> = {
 };
 
 function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
-  // Только флаг выбора по подписке, экшены — стабильные через getState.
   const selectedTaskId = useTasksStore((s) => s.selectedTaskId);
   const setSelectedTask = useTasksStore.getState().setSelectedTask;
   const completeTask = useTasksStore.getState().completeTask;
@@ -47,7 +46,6 @@ function KanbanCard({ task, isDragging }: { task: any; isDragging?: boolean }) {
   const dot = PRIORITY_DOT[task.priority] || PRIORITY_DOT.NONE;
   const done = task.status === 'COMPLETED';
 
-  // Touch-friendly «Переместить» для телефона: шаг статуса влево/вправо.
   const statusOrder = COLUMNS.map((c) => c.id);
   const currentIdx = Math.max(
     0,
@@ -243,7 +241,6 @@ function Column({
   );
 }
 
-/** Мобильный индикатор колонки «1 / 3» + точки — только телефон. */
 function KanbanMobileIndicator({ targetId, total }: { targetId: string; total: number }) {
   const [active, setActive] = useState(0);
 

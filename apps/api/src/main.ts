@@ -33,8 +33,6 @@ import {
 
 dotenv.config();
 
-// Fail-fast для production: без настоящего JWT_SECRET приложение
-// не запускается (никаких fallback-секретов в проде).
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('FATAL: JWT_SECRET is not set. Refusing to start in production.');
 }
@@ -50,22 +48,8 @@ if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
 
 const app = express();
 
-/**
- * Vercel работает как reverse proxy и ставит X-Forwarded-For.
- * Без trust proxy express-rate-limit не может определить реальный IP
- * и отвечает 429 (ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) на каждый запрос.
- * Один хоп — Vercel proxy. Устанавливается ДО любых rate limiter middleware.
- */
 app.set('trust proxy', 1);
 
-/**
- * CORS
- *
- * Основной production frontend:
- * https://task-flow-axsion.vercel.app
- *
- * Также оставляем старые/локальные адреса для совместимости.
- */
 const configuredOrigins = [
   ...(process.env.CORS_ORIGIN || "").split(","),
   ...(process.env.FRONTEND_URL || "").split(","),
@@ -88,8 +72,6 @@ const corsOrigin = (
   origin: string | undefined,
   callback: (error: Error | null, allow?: boolean) => void,
 ) => {
-  // Разрешаем запросы без Origin:
-  // health checks, server-to-server и т.д.
   if (!origin) {
     callback(null, true);
     return;
@@ -125,7 +107,6 @@ const PORT = process.env.PORT || 3001;
 
 app.use(
   helmet({
-    // API отдаёт только JSON/редиректы, HTML нет — строгий CSP безопасен.
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'none'"],
@@ -139,7 +120,6 @@ app.use(
 
 app.use(cors(corsOptions));
 
-// Явно обрабатываем CORS preflight OPTIONS-запросы.
 app.options("*", cors(corsOptions));
 
 app.use(express.json({ limit: "1mb" }));
@@ -163,9 +143,6 @@ app.get("/health", (_req, res) => {
 
 app.use("/auth", authRouter);
 
-// Пользовательские API: authentication → maintenanceGate → router.
-// Админка (/admin) намеренно БЕЗ maintenanceGate: bypass структурный —
-// admin-роутер требует валидную ADMIN-сессию (authMiddleware + requireAdmin).
 app.use("/tasks", authMiddleware, maintenanceGate, writeLimiter, tasksRouter);
 app.use("/projects", authMiddleware, maintenanceGate, writeLimiter, projectsRouter);
 app.use("/tags", authMiddleware, maintenanceGate, writeLimiter, tagsRouter);
@@ -214,7 +191,6 @@ io.on("connection", (socket) => {
   const ownId = socket.data.userId as string;
 
   socket.on("join:user", (userId: string) => {
-    // Только своя комната — чужие ID отклоняются.
     if (typeof userId !== "string" || userId !== ownId) return;
     socket.join(`user:${ownId}`);
   });
@@ -226,7 +202,6 @@ io.on("connection", (socket) => {
       const membership = await prisma.projectMember.findFirst({
         where: { projectId, userId: ownId },
       });
-      // Без membership комнату не выдаём (проверка ДО join).
       if (!membership) return;
       socket.join(`project:${projectId}`);
     } catch {

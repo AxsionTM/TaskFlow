@@ -133,7 +133,7 @@ export function FocusView() {
             </div>
           </div>
 
-          {/* Сессия завершена */}
+          {}
           {sessionFinished && (
             <div className="mt-6 w-full rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-center">
               <p className="text-sm font-semibold text-emerald-500">Сессия завершена — отличная работа!</p>
@@ -226,7 +226,7 @@ export function FocusView() {
           )}
 
           </div>
-        {/* Right column: recent sessions + quote, как в дизайне */}
+        {}
         <div className="flex min-w-0 flex-col gap-4">
           <div className="tf-glass rounded-3xl p-4">
             <h3 className="text-sm font-semibold mb-3 flex items-center gap-1.5">

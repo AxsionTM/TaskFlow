@@ -1,7 +1,3 @@
-/**
- * Парсинг естественных русских дат/времени с учётом timezone пользователя.
- * Без внешних зависимостей: только Intl.
- */
 
 const RU_MONTHS: Record<string, number> = {
   'января': 1, 'февраля': 2, 'марта': 3, 'апреля': 4, 'мая': 5, 'июня': 6,
@@ -9,7 +5,6 @@ const RU_MONTHS: Record<string, number> = {
 };
 
 const RU_WEEKDAYS: Record<string, number> = {
-  // JS: 0=вс..6=сб
   'воскресенье': 0, 'воскресенья': 0,
   'понедельник': 1, 'понедельника': 1, 'понедельникам': 1,
   'вторник': 2, 'вторника': 2, 'вторникам': 2,
@@ -35,7 +30,6 @@ function partsInTz(tz: string, at: Date): { y: number; mo: number; d: number; h:
   };
 }
 
-/** Смещение timezone (мс) для момента UTC. */
 function tzOffsetMs(tz: string, utc: Date): number {
   try {
     const dtf = new Intl.DateTimeFormat('en-US', {
@@ -53,7 +47,6 @@ function tzOffsetMs(tz: string, utc: Date): number {
   }
 }
 
-/** Локальное wall-время в tz -> ISO UTC. */
 export function zonedToISO(tz: string, y: number, mo: number, d: number, h: number, mi: number): string {
   let guess = Date.UTC(y, mo - 1, d, h, mi, 0);
   for (let i = 0; i < 2; i++) {
@@ -66,7 +59,6 @@ export function dayStartISO(tz: string, y: number, mo: number, d: number): strin
   return zonedToISO(tz || 'UTC', y, mo, d, 0, 0);
 }
 
-/** Завтра 12:00 в timezone — дефолт для массовых переносов. */
 export function zonedTomorrowNoon(tz: string, now: Date = new Date()): string {
   const key = dayKeyInTz(new Date(now.getTime() + 86400000), tz || 'UTC').split('-').map(Number);
   return zonedToISO(tz || 'UTC', key[0], key[1], key[2], 12, 0);
@@ -78,13 +70,11 @@ function daysInMonth(y: number, mo: number): number {
 
 export interface ParsedDateTime {
   iso: string;
-  /** Конец диапазона ("с 16 до 20"), если указан. */
   endISO?: string;
   hasTime: boolean;
   label: string;
 }
 
-/** Слова-числа для часов: "с четырёх до восьми". */
 const WORD_NUMS: Record<string, number> = {
   'час': 1, 'часа': 1, 'один': 1, 'одна': 1, 'одного': 1, 'одной': 1,
   'два': 2, 'две': 2, 'двух': 2, 'три': 3, 'трех': 3, 'трёх': 3,
@@ -106,10 +96,6 @@ function wordToHour(s: string): number | null {
   return WORD_NUMS[t] ?? null;
 }
 
-/**
- * Ищет в тексте дату/время. Возвращает null если ничего нет.
- * now — текущий момент (серверный), tz — timezone пользователя.
- */
 export function parseRuDateTime(rawText: string, tz: string, now: Date = new Date()): ParsedDateTime | null {
   const text = ` ${rawText.toLowerCase().replace(/ё/g, 'е')} `;
   const zone = tz || 'UTC';
@@ -143,7 +129,6 @@ export function parseRuDateTime(rawText: string, tz: string, now: Date = new Dat
   }
 
   if (!foundDay) {
-    // "через 3 дня / через 2 недели"
     const rel = text.match(/через\s+(\d+)\s+(день|дня|дней|неделю|недели|недель)/);
     if (rel) {
       const n = Number(rel[1]);
@@ -155,7 +140,6 @@ export function parseRuDateTime(rawText: string, tz: string, now: Date = new Dat
   }
 
   if (!foundDay) {
-    // "20 сентября" / "20.09"
     const md = text.match(/(\d{1,2})\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)/);
     const nd = !md && text.match(/(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?/);
     if (md) {
@@ -188,19 +172,17 @@ export function parseRuDateTime(rawText: string, tz: string, now: Date = new Dat
   }
 
   if (!foundDay) {
-    // дни недели: "в понедельник", "на понедельник", "к пятнице"
     const nextWeek = /на следующей неделе/.test(text);
     const wm = text.match(/(?:в|во|к|до|на)\s+([а-я]+)/);
     const wd = wm ? RU_WEEKDAYS[wm[1]] : undefined;
     if (wd !== undefined) {
       let delta = (wd - cur.wd + 7) % 7;
-      if (delta === 0) delta = 7; // "в понедельник" в понедельник = следующий
+      if (delta === 0) delta = 7;
       if (nextWeek) delta += 7;
       shiftDay(delta);
       foundDay = true;
       label = (nextWeek ? 'на следующей неделе' : '') + (wm ? ` ${wm[1]}` : '');
     } else if (nextWeek) {
-      // ближайший понедельник следующей недели
       let delta = (1 - cur.wd + 7) % 7;
       if (delta === 0) delta = 7;
       shiftDay(delta + 7);
@@ -211,7 +193,6 @@ export function parseRuDateTime(rawText: string, tz: string, now: Date = new Dat
 
   if (!foundDay) return null;
 
-  // Диапазон: "с 16 до 20", "с 16:30 до 20:00", "с четырёх до восьми"
   let hh = 12;
   let mm = 0;
   let hasTime = false;
@@ -239,14 +220,12 @@ export function parseRuDateTime(rawText: string, tz: string, now: Date = new Dat
       hasTime = true;
     }
   }
-  // Время: "в 16:00", "на 16:00", "в 16", "утром", "днём", "вечером"
   if (!hasTime) {
     const tmMatch = text.match(/(?:в|к|на)\s+(\d{1,2})(?::(\d{2}))?/);
     if (tmMatch) {
       const h = Number(tmMatch[1]);
       const m = tmMatch[2] !== undefined ? Number(tmMatch[2]) : 0;
       if (h <= 23 && m <= 59) {
-        // "на 5 подзадач" — не время: требуется минуты или контекст времени
         const isBareCount = tmMatch[2] === undefined && /на\s+\d+\s+(подзадач|задач|раз|проект)/.test(text);
         if (!isBareCount) {
           hh = h;
@@ -279,7 +258,6 @@ export function parseRuDateTime(rawText: string, tz: string, now: Date = new Dat
   return result;
 }
 
-/** Человекочитаемая дата ISO в timezone пользователя. */
 export function formatInTz(iso: string | null | undefined, tz: string): string {
   if (!iso) return 'без срока';
   try {
@@ -292,7 +270,6 @@ export function formatInTz(iso: string | null | undefined, tz: string): string {
   }
 }
 
-/** Ключ дня YYYY-MM-DD в timezone. */
 export function dayKeyInTz(d: Date, tz: string): string {
   try {
     const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);

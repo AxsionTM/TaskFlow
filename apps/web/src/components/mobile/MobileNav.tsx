@@ -4,7 +4,6 @@ import { CalendarCheck, Timer, Network, LayoutGrid, Plus } from 'lucide-react';
 import { useTasksStore } from '@/stores/tasks';
 import { cn } from '@/lib/utils';
 
-/** Сигнал для глобальной формы создания задачи (GlobalQuickAdd + локальные модалки). */
 export function openQuickAdd() {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('tf:quick-add'));
@@ -21,7 +20,6 @@ const RIGHT_ITEMS = [
   { id: 'more', label: 'Ещё', icon: LayoutGrid },
 ] as const;
 
-/** Нижняя навигация телефона как в референсе: 4 пункта + центральная кнопка «+». */
 export function MobileNav({ onMore }: { onMore: () => void }) {
   const { currentView, setCurrentView, setCurrentProject } = useTasksStore();
 

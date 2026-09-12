@@ -34,8 +34,6 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  // Клавиатура уменьшает layout (а не наезжает поверх): sticky-футеры
-  // Save/Delete остаются видимыми при вводе на мобильных.
   interactiveWidget: 'resizes-content',
 };
 

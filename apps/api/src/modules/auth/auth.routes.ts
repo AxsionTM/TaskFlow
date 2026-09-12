@@ -26,7 +26,6 @@ const registerSchema = z.object({
   turnstileToken: z.string().max(4096).optional(),
 });
 
-// Строгий лимит для кодовых эндпоинтов: защита от перебора и спама письмами.
 const codeLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 30,
@@ -105,7 +104,7 @@ async function findOrCreateOAuthUser(params: {
         email: params.email.toLowerCase(),
         name: params.name || params.email.split('@')[0],
         avatarUrl: params.avatarUrl,
-        emailVerified: true, // email уже подтверждён провайдером (Google/GitHub)
+        emailVerified: true,
       },
     });
     await ensureInbox(user.id);
@@ -125,9 +124,6 @@ async function findOrCreateOAuthUser(params: {
   return user;
 }
 
-// Публичный статус обслуживания: нужен пользовательской части,
-// чтобы показать maintenance-экран до/без авторизации.
-// no-store: CDN/браузер не должны отдавать stale-статус после переключения.
 router.get('/system/status', async (_req, res, next) => {
   try {
     const row = await prisma.systemSetting.findUnique({ where: { key: 'MAINTENANCE_MODE' } });
@@ -163,8 +159,6 @@ router.post('/register', registerLimiter, async (req, res, next) => {
 
     const email = data.email.toLowerCase();
 
-    // 1. Turnstile: только server-side проверка, секрет не покидает backend.
-    // Без пройденной капчи (при настроенных ключах) регистрация отклоняется.
     const xff = req.headers['x-forwarded-for'];
     const clientIp = (typeof xff === 'string' && xff.length ? xff.split(',')[0].trim() : req.ip) || undefined;
     const ts = await verifyTurnstileToken(data.turnstileToken, clientIp);
@@ -172,12 +166,9 @@ router.post('/register', registerLimiter, async (req, res, next) => {
       throw new AppError(400, ts.error, 'TURNSTILE_FAILED');
     }
 
-    // 2. Anti-abuse: временные лимиты по IP/частоте (без вечных банов).
     const ipHash = clientIpHash(req);
     await checkRegistrationAbuse(ipHash, email);
 
-    // В production без настроенного SMTP регистрация бессмысленна
-    // (код подтверждения не дойдёт) — отказываем до создания записей.
     if (process.env.NODE_ENV === 'production' && !isEmailConfigured()) {
       throw new AppError(503, 'Регистрация временно недоступна. Попробуйте позже.');
     }
@@ -187,8 +178,6 @@ router.post('/register', registerLimiter, async (req, res, next) => {
       throw new AppError(409, 'Пользователь с таким email уже существует');
     }
 
-    // 3. Полноценный User НЕ создаём: только временная pending-запись с TTL.
-    // PostgreSQL не забивается мусорными аккаунтами ботов.
     const passwordHash = await bcrypt.hash(data.password, 12);
     const now = new Date();
     await prisma.pendingRegistration.upsert({
@@ -209,8 +198,6 @@ router.post('/register', registerLimiter, async (req, res, next) => {
 
     await recordAttempt(ipHash, email);
 
-    // Код подтверждения: пользователь активируется только после verify-email.
-    // Токен сессии НЕ выдаём до подтверждения почты.
     const code = await issueCode(email, 'VERIFY_EMAIL');
     const mail = await sendVerificationCode({ to: email, code, kind: 'verify' });
 
@@ -238,15 +225,12 @@ router.post('/verify-email', codeLimiter, async (req, res, next) => {
 
     const email = data.email.toLowerCase();
 
-    // Новый flow: pending-регистрация превращается в полноценного User
-    // ТОЛЬКО после успешного кода. До этого в users ничего нет.
     const pending = await prisma.pendingRegistration.findUnique({ where: { email } });
     if (pending) {
       if (pending.expiresAt.getTime() <= Date.now()) {
         await prisma.pendingRegistration.delete({ where: { id: pending.id } }).catch(() => {});
         throw new AppError(400, 'Срок действия кода истёк. Зарегистрируйтесь снова.', 'CODE_EXPIRED');
       }
-      // Anti-bot: слишком быстрое подтверждение после создания pending.
       if (Date.now() - pending.createdAt.getTime() < abuseConfig.minVerifyDelaySec * 1000) {
         throw new AppError(429, 'Подождите немного и попробуйте снова.', 'RATE_LIMITED');
       }
@@ -280,8 +264,6 @@ router.post('/verify-email', codeLimiter, async (req, res, next) => {
       });
     }
 
-    // Legacy-путь: пользователи, созданные до pending-flow (уже в users,
-    // но emailVerified=false). Новых таких больше не появляется.
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       throw new AppError(400, 'Неверный код. Проверьте и попробуйте снова.', 'INVALID_CODE');
@@ -330,7 +312,6 @@ router.post('/resend-code', codeLimiter, async (req, res, next) => {
 
     const user = await prisma.user.findUnique({ where: { email } });
 
-    // Pending-регистрация: продлеваем жизнь и шлём код заново.
     if (!user && target === 'VERIFY_EMAIL') {
       const pending = await prisma.pendingRegistration.findUnique({ where: { email } });
       if (pending) {
@@ -353,8 +334,6 @@ router.post('/resend-code', codeLimiter, async (req, res, next) => {
       }
     }
 
-    // Не раскрываем существование аккаунта для reset; для verify тоже отвечаем
-    // нейтрально, если пользователя нет.
     if (!user) {
       return res.json({ ok: true, message: 'Если аккаунт с таким email существует, мы отправили код.' });
     }
@@ -401,7 +380,6 @@ router.post('/forgot-password', codeLimiter, async (req, res, next) => {
         const mail = await sendVerificationCode({ to: email, code, kind: 'reset' });
         devCode = mail.devCode;
       } catch (err) {
-        // Cooldown/rate-limit: не раскрываем детали сверх необходимого.
         if (err instanceof AppError && (err.statusCode === 429)) throw err;
       }
     }
@@ -479,8 +457,6 @@ router.post('/reset-password', codeLimiter, async (req, res, next) => {
     const now = new Date();
     const updated = await prisma.user.update({
       where: { id: user.id },
-      // Смена пароля доказывает владение почтой → подтверждаем её заодно.
-      // passwordChangedAt инвалидирует все ранее выпущенные токены.
       data: { passwordHash, emailVerified: true, emailVerifiedAt: user.emailVerifiedAt || now, lastActiveAt: now, passwordChangedAt: now },
     });
     await invalidateCodes(updated.email, 'RESET_PASSWORD');
@@ -533,7 +509,6 @@ router.post('/login', loginLimiter, async (req, res, next) => {
 
     await prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } });
 
-    // Вход администратора — в audit log (fire-and-forget).
     if (user.role === 'ADMIN') {
       const xff = req.headers['x-forwarded-for'];
       const ip = (typeof xff === 'string' && xff.length ? xff.split(',')[0].trim() : req.ip)?.slice(0, 64);

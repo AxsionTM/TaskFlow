@@ -183,7 +183,7 @@ export function UserDetail({
         <ArrowLeft className="h-4 w-4" /> К пользователям
       </button>
 
-      {/* Шапка профиля */}
+      {}
       <div className="rounded-2xl border border-border/60 bg-card/70 p-4 sm:p-5">
         <div className="flex flex-wrap items-start gap-4">
           <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-xl font-bold text-primary">

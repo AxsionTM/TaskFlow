@@ -49,7 +49,6 @@ function VerifyContent() {
       setDigit(index, '');
       return;
     }
-    // Вставка целого кода — раскладываем по полям
     if (clean.length > 1) {
       const chars = clean.slice(0, CODE_LEN).split('');
       setDigits((prev) => {

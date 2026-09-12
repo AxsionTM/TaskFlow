@@ -63,7 +63,6 @@ model User {
   planStartedAt DateTime?
   planExpiresAt DateTime?
   lastActiveAt  DateTime?
-  // Инвалидация JWT после смены пароля: токены старше этой метки отклоняются.
   passwordChangedAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -101,8 +100,6 @@ enum TransactionStatus {
   FAILED
 }
 
-// Движение средств. Баланс меняется ТОЛЬКО вместе с созданием транзакции
-// (атомарно в коде через $transaction).
 model Transaction {
   id            String            @id @default(cuid())
   userId        String
@@ -128,8 +125,6 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
-// История тарифов пользователя. Активная подписка = ACTIVE с endsAt в будущем
-// (FREE без срока считается активной по умолчанию).
 model Subscription {
   id            String             @id @default(cuid())
   userId        String
@@ -150,7 +145,6 @@ model Subscription {
   @@map("subscriptions")
 }
 
-// Журнал действий администраторов.
 model AdminLog {
   id           String   @id @default(cuid())
   adminId      String
@@ -170,8 +164,6 @@ model AdminLog {
   @@map("admin_logs")
 }
 
-// Большая текстовая заметка задачи. Одна задача — максимум одна заметка.
-// Удаление задачи каскадно удаляет заметку (orphan notes невозможны).
 model Note {
   id        String   @id @default(cuid())
   userId    String
@@ -187,8 +179,6 @@ model Note {
   @@map("notes")
 }
 
-// AI Agent: разговоры, сообщения, вызовы инструментов.
-// Контекст (lastTaskId, кандидаты выбора, pending confirm) — в context JSON.
 model AIConversation {
   id        String      @id @default(cuid())
   userId    String
@@ -230,7 +220,6 @@ model AIToolCall {
   @@map("ai_tool_calls")
 }
 
-// Реестр ошибок приложения для Error Center (только 5xx, без секретов).
 model ErrorLog {
   id         String   @id @default(cuid())
   endpoint   String
@@ -250,7 +239,6 @@ model ErrorLog {
   @@map("error_logs")
 }
 
-// Фича-флаги: только реально существующие возможности сервиса.
 model FeatureFlag {
   key         String   @id
   description String?
@@ -260,7 +248,6 @@ model FeatureFlag {
   @@map("feature_flags")
 }
 
-// Системные настройки (maintenance mode и т.п.), ключ-значение.
 model SystemSetting {
   key       String   @id
   value     String
@@ -274,8 +261,6 @@ enum VerificationPurpose {
   RESET_PASSWORD
 }
 
-// Временная pending-регистрация: полноценный User создаётся ТОЛЬКО после
-// подтверждения email-кода. PostgreSQL не забивается мусорными аккаунтами.
 model PendingRegistration {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -288,8 +273,6 @@ model PendingRegistration {
   @@map("pending_registrations")
 }
 
-// Anti-abuse сигналы: только хеши, TTL 24ч, отделены от User.
-// Удаление пользователя не мешает повторной регистрации тем же email.
 model RegistrationAttempt {
   id        String   @id @default(cuid())
   ipHash    String
@@ -300,9 +283,6 @@ model RegistrationAttempt {
   @@map("registration_attempts")
 }
 
-// Одноразовые коды подтверждения (email verify / password reset).
-// Сам код хранится только в виде sha256-хэша, живёт 15 минут,
-// после 5 неудачных попыток или успешного использования инвалидируется.
 model VerificationCode {
   id        String              @id @default(cuid())
   email     String

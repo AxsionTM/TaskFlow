@@ -21,7 +21,6 @@ const createTaskSchema = z.object({
   recurrenceRule: z.string().optional().nullable(),
   remindMinutes: z.number().int().optional().nullable(),
   remindRepeatMinutes: z.number().int().min(1).max(60).optional().nullable(),
-  // Опциональная заметка: создаётся атомарно вместе с задачей (одна транзакция).
   noteContent: z
     .string()
     .min(1)
@@ -451,8 +450,6 @@ router.get('/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
-// Серия напоминаний: первое за remindMinutes до срока, дальше повтор
-// каждые repeatMinutes вплоть до срока (максимум 12 штук от спама).
 function buildReminderTimes(due: Date, remindMinutes: number, repeatMinutes?: number | null): Date[] {
   const first = new Date(due.getTime() - remindMinutes * 60 * 1000);
   const times: Date[] = [first];
@@ -476,8 +473,6 @@ router.post('/', async (req: AuthRequest, res, next) => {
     if (data.noteContent && isSubtaskCreate) {
       throw new AppError(400, 'Заметка доступна только для обычной задачи');
     }
-    // Задача + заметка создаются одной транзакцией: неконсистентное
-    // состояние (задача без заметки при ошибке) невозможно.
     const task = await prisma.$transaction(async (tx) => {
       const created = await tx.task.create({
         data: {
@@ -740,8 +735,6 @@ router.post('/:id/complete', async (req: AuthRequest, res, next) => {
       },
     });
 
-    // Recurrence отключен в UI: при выполнении копии больше не создаем,
-    // чтобы не плодить задачи-призраки. Старые колонки в БД оставлены как есть.
     void existing;
 
     const io = req.app.get('io');

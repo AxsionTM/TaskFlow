@@ -14,8 +14,6 @@ const FLAG_COLOR: Record<string, string> = {
 };
 
 export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
-  // Селекторы вместо подписки на весь стор: строка не перерисовывается
-  // при изменениях несвязанных частей состояния; экшены стабильны через getState.
   const selectedTaskId = useTasksStore((s) => s.selectedTaskId);
   const currentView = useTasksStore((s) => s.currentView);
   const setSelectedTask = useTasksStore.getState().setSelectedTask;

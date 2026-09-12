@@ -135,7 +135,6 @@ export function ObsidianGraph({ nodes, edges, onOpenTask, hideTimeline, colorMod
     const canvas = canvasRef.current, wrap = wrapRef.current;
     if (!canvas || !wrap) return;
     const rect = wrap.getBoundingClientRect();
-    // Mobile: DPR 1.5 достаточно для чёткости и заметно дешевле для батареи/GPU.
     const coarse = window.matchMedia('(pointer: coarse)').matches;
     const dpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
     dprRef.current = dpr;
@@ -275,7 +274,6 @@ export function ObsidianGraph({ nodes, edges, onOpenTask, hideTimeline, colorMod
   const expandedDescendantCount=useMemo(()=>{if(!expandedDate)return 0;return Math.max(0,Array.from(visibleTaskIds).length-expandedRoots.length);},[expandedDate,visibleTaskIds,expandedRoots.length]);
   const expandedDateNode=dateNodes.find(n=>n.dateKey===expandedDate);
 
-  // Пробрасываем выбранный день наружу — панель рисуется в правом сайдбаре, а не поверх графа.
   useEffect(() => {
     if (!onSelectedDay) return;
     if (!expandedDateNode) { onSelectedDay(null); return; }

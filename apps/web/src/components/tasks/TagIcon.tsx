@@ -55,7 +55,6 @@ const MAP: Record<string, any> = {
   tag: TagGlyph,
 };
 
-/** Старые эмодзи-значения маппим на контурные SVG — системных эмодзи в UI нет. */
 const EMOJI_MAP: Record<string, string> = {
   '💼': 'briefcase',
   '🏋': 'dumbbell',
@@ -87,12 +86,10 @@ const EMOJI_MAP: Record<string, string> = {
   '🔔': 'bell',
 };
 
-/** Контурная монохромная SVG-иконка тега (Lucide outline, без фона). Цвет — через CSS currentColor. */
 export function TagIcon({ icon, className }: { icon?: string | null; className?: string }) {
   if (!icon) return <TagGlyph className={cn('h-3 w-3', className)} />;
   const key = EMOJI_MAP[icon] || icon;
   const C = MAP[key];
   if (C) return <C className={cn('h-3 w-3', className)} />;
-  // Неизвестное значение — аккуратный дефолтный контур, а не сырой эмодзи-текст
   return <TagGlyph className={cn('h-3 w-3', className)} />;
 }

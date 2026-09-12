@@ -11,7 +11,6 @@ interface FocusState {
   /** Absolute timestamp when current segment ends (for background accuracy) */
   endsAt: number | null;
   completedPomodoros: number;
-  /** true после 00:00 — таймер остановлен, shown «Сессия завершена» */
   sessionFinished: boolean;
   sessions: any[];
   stats: { totalMinutes: number; totalSessions: number; averageMinutes: number } | null;
@@ -22,7 +21,6 @@ interface FocusState {
   pause: () => void;
   resume: () => void;
   reset: () => void;
-  /** Закрыть экран завершения и начать новую рабочую сессию */
   startNext: () => void;
   dismissFinished: () => void;
   stopSound: () => void;
@@ -65,7 +63,6 @@ function saveDay(pomodoros: number, minutes: number) {
   } catch {}
 }
 
-// --- Звук окончания: приятная, но заметная мелодия (WebAudio, без файлов) ---
 let audioCtx: AudioContext | null = null;
 let activeNodes: OscillatorNode[] = [];
 
@@ -85,7 +82,6 @@ function playCompletionSound() {
     if (!audioCtx) audioCtx = new Ctx();
     if (audioCtx.state === 'suspended') void audioCtx.resume();
     const ctx = audioCtx;
-    // Три мягких колокольчика: E5 → G5 → C6, каждый ~0.6с. Не бесконечный.
     const notes = [659.25, 783.99, 1046.5];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
@@ -101,7 +97,6 @@ function playCompletionSound() {
       osc.stop(t0 + 0.65);
       activeNodes.push(osc);
     });
-    // Автоочистка
     window.setTimeout(stopCompletionSound, 2500);
   } catch {}
 }
@@ -205,8 +200,6 @@ export const useFocusStore = create<FocusState>((set, get) => ({
 
     const left = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
     if (left <= 0) {
-      // Рабочая сессия завершена: останавливаем таймер на 00:00,
-      // увеличиваем счётчики, сохраняем, играем звук.
       const day = loadDay();
       const nextPomodoros = day.pomodoros + 1;
       const billable = Math.max(1, Math.round(workMinutes));
@@ -219,7 +212,6 @@ export const useFocusStore = create<FocusState>((set, get) => ({
         endsAt: null,
         completedPomodoros: nextPomodoros,
         sessionFinished: true,
-        // Оптимистично обновляем статистику сразу, до ответа сервера
         stats: get().stats
           ? {
               totalMinutes: get().stats!.totalMinutes + billable,
@@ -271,7 +263,6 @@ export const useFocusStore = create<FocusState>((set, get) => ({
     try {
       const { sessions } = await api.getFocusSessions();
       set({ sessions });
-      // Синхронизируем локальный счётчик «сегодня» с сервером, если сервер знает больше
       try {
         const key = todayKey();
         const todayCount = sessions.filter(

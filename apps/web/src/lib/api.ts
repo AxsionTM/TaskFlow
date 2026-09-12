@@ -14,7 +14,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 class ApiClient {
   private token: string | null = null;
-  /** Известный maintenance-режим: фоновые воркеры не спамят запросами. */
   private maintenanceKnown = false;
 
   isMaintenanceKnown(): boolean {
@@ -51,8 +50,6 @@ class ApiClient {
 
     let res: Response;
     try {
-      // no-store: без этого браузер / Vercel CDN могут отдать закэшированный
-      // GET /tasks и новая задача не появится до жёсткой перезагрузки.
       res = await fetch(`${API_URL}${path}`, { ...options, headers, cache: 'no-store' });
     } catch {
       throw new ApiError('Не удалось подключиться к серверу', 0);
@@ -62,8 +59,6 @@ class ApiClient {
       const error = await res.json().catch(() => ({ error: { message: `Ошибка ${res.status}` } }));
       const msg = error.error?.message || error.message || `Ошибка ${res.status}`;
       const code = error.error?.code || error.code;
-      // Централизованная обработка maintenance: один флаг + событие для стора,
-      // без спама повторными запросами и десятками ошибок в консоли.
       if (res.status === 503 && code === 'MAINTENANCE' && typeof window !== 'undefined') {
         this.maintenanceKnown = true;
         window.dispatchEvent(new CustomEvent('tf:maintenance', { detail: { message: msg } }));
@@ -338,7 +333,6 @@ class ApiClient {
     return this.request<{ user: any }>('/auth/me', { method: 'PATCH', body: JSON.stringify(data) });
   }
 
-  // --- Admin (требует роль ADMIN на backend) ---
   adminStats() {
     return this.request<any>('/admin/stats');
   }
@@ -572,7 +566,6 @@ class ApiClient {
     });
   }
 
-  // --- User notifications (серверные, переживают refresh) ---
   getNotifications(limit = 20, unreadOnly = false) {
     const q = new URLSearchParams({ limit: String(limit) });
     if (unreadOnly) q.set('unreadOnly', 'true');
@@ -591,7 +584,6 @@ class ApiClient {
     return this.request<{ ok: boolean; marked: number }>('/notifications/read-all', { method: 'POST' });
   }
 
-  // --- Notes (одна задача = максимум одна заметка) ---
   getNotes() {
     return this.request<{
       notes: { id: string; taskId: string; taskTitle: string; preview: string; updatedAt: string }[];

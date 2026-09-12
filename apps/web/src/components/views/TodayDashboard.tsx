@@ -56,8 +56,6 @@ export function TodayDashboard() {
     fetchSessions();
   }, [fetchHabits, fetchGoals, fetchStats, fetchSessions]);
 
-  // Прогресс с учетом подзадач: задача с детьми дает долю за каждую
-  // выполненную подзадачу, задача без детей — 0/100% по статусу.
   const taskScore = (t: any): number => {
     const kids = (t.children || []).filter((c: any) => !c.isDeleted);
     if (kids.length > 0) {

@@ -8,8 +8,6 @@ export interface AuthRequest extends Request {
   userRole?: string;
 }
 
-// Кэш maintenance-флага, чтобы не ходить в БД на каждый запрос.
-// TTL короткий: включение в админке видно пользователям за секунды.
 let maintenanceCache: { value: boolean; message: string; at: number } | null = null;
 const MAINTENANCE_CACHE_TTL = 5000;
 
@@ -36,15 +34,6 @@ export function invalidateMaintenanceCache() {
   maintenanceCache = null;
 }
 
-/**
- * Maintenance gate — отдельный шаг цепочки ПОСЛЕ authentication.
- * Порядок: security → authentication → identify (authMiddleware) →
- * maintenance check → authorization (requireAdmin / ownership per-route).
- * ADMIN сюда не попадает вовсе: admin-роутер монтируется без этого gate,
- * bypass структурный, а не условный. Обычный пользователь с любым
- * (в т.ч. поддельным) JWT пройти не может: без валидной ADMIN-сессии
- * gate всегда отвечает 503 при включённом режиме.
- */
 export async function maintenanceGate(req: AuthRequest, _res: Response, next: NextFunction) {
   try {
     if (!req.userId) {
@@ -76,9 +65,6 @@ export async function authMiddleware(
   try {
     const payload = verifyToken(token);
 
-    // Проверяем существование, роль и блокировку на каждый запрос:
-    // заблокированный пользователь мгновенно теряет доступ к API,
-    // даже если JWT ещё не истёк.
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
       select: { id: true, role: true, isBlocked: true, passwordChangedAt: true },
@@ -92,7 +78,6 @@ export async function authMiddleware(
       return next(new AppError(403, 'Аккаунт заблокирован', 'ACCOUNT_BLOCKED'));
     }
 
-    // Токены, выпущенные до смены пароля, больше недействительны.
     if (
       user.passwordChangedAt &&
       typeof payload.iat === 'number' &&

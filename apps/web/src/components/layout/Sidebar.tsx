@@ -53,11 +53,6 @@ interface SidebarProps {
   onMobileClose?: () => void;
 }
 
-/**
- * Кнопка «Фокус» с живой подпиской только внутри себя.
- * Причина: раньше весь Sidebar подписывался на remainingSeconds и
- * перерисовывался 4 раза в секунду во время фокус-сессии.
- */
 function FocusNavButton({ active, onClick }: { active: boolean; onClick: () => void }) {
   const focusRunning = useFocusStore((s) => s.isRunning);
   const focusPaused = useFocusStore((s) => s.isPaused);

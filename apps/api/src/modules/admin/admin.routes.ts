@@ -9,7 +9,6 @@ import { invalidateAiFlagCache } from '../ai/ai.routes';
 
 const router = Router();
 
-// Все endpoints ниже: сначала authentication, затем проверка роли ADMIN на backend.
 router.use(authMiddleware, requireAdmin);
 
 const PLANS = ['FREE', 'PRO', 'BUSINESS'] as const;
@@ -381,7 +380,6 @@ router.patch('/users/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
-// --- Balance (только через транзакции) ---
 
 const balanceSchema = z.object({
   amount: z.number().positive('Сумма должна быть положительной').max(10000000),
@@ -527,8 +525,6 @@ router.post('/users/:id/unblock', async (req: AuthRequest, res, next) => {
 
 router.post('/users/:id/role', async (req: AuthRequest, res, next) => {
   try {
-    // Свою роль изменить нельзя — только чужую. Самоповышение невозможно:
-    // endpoint требует ADMIN, а роль может менять только существующий ADMIN.
     if (req.params.id === req.userId) throw new AppError(400, 'Нельзя изменить собственную роль');
     const data = z.object({ role: z.enum(ROLES) }).parse(req.body);
     const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
@@ -557,7 +553,6 @@ router.get('/subscriptions', async (req, res, next) => {
     const where: any = {};
     if (q.plan) where.plan = q.plan;
     if (q.status) where.status = q.status;
-    // Связи Subscription→User в схеме нет — ищем пользователей отдельно, фильтруем по userId.
     if (q.search) {
       const matched = await prisma.user.findMany({
         where: {
@@ -772,7 +767,6 @@ router.get('/logs', async (req, res, next) => {
   }
 });
 
-// --- Settings / status (без секретов) ---
 
 router.get('/settings', async (_req, res, next) => {
   try {
@@ -785,9 +779,7 @@ router.get('/settings', async (_req, res, next) => {
     } catch {
       dbStatus = 'error';
     }
-    // Redis в проекте не используется (пакет ioredis установлен, обращений из src нет).
     const redisStatus = 'not_used';
-    // AI-сервис: лёгкий health-check с коротким таймаутом.
     let aiStatus: 'ok' | 'error' | 'unconfigured' = 'unconfigured';
     if (process.env.AI_SERVICE_URL) {
       try {
@@ -883,7 +875,6 @@ router.post('/users', async (req: AuthRequest, res, next) => {
   }
 });
 
-// --- Full delete user (необратимо, с каскадом по связям) ---
 
 router.delete('/users/:id', async (req: AuthRequest, res, next) => {
   try {
@@ -896,21 +887,14 @@ router.delete('/users/:id', async (req: AuthRequest, res, next) => {
     if (existing.role === 'ADMIN') throw new AppError(400, 'Нельзя удалить администратора');
 
     await prisma.$transaction(async (tx) => {
-      // Задачи пользователя удаляем явно (у creatorId нет onDelete Cascade),
-      // чтобы не оставить сломанных references; вложенности каскадируются.
       const ownTaskIds = (
         await tx.task.findMany({ where: { creatorId: existing.id }, select: { id: true } })
       ).map((t) => t.id);
       if (ownTaskIds.length) {
         await tx.task.deleteMany({ where: { id: { in: ownTaskIds } } });
       }
-      // Чужие задачи, назначенные пользователю, — снимаем назначение.
       await tx.task.updateMany({ where: { assigneeId: existing.id }, data: { assigneeId: null } });
-      // Коды верификации привязаны к email строкой — чистим, чтобы не мешались.
       await tx.verificationCode.deleteMany({ where: { email: existing.email } });
-      // Остальное (аккаунты OAuth, дни рождения, сессии, проекты-участия,
-      // теги, привычки, цели, списки, фокус-сессии, уведомления, подписки,
-      // транзакции) удаляется через onDelete: Cascade в схеме.
       await tx.user.delete({ where: { id: existing.id } });
     });
 
@@ -921,7 +905,6 @@ router.delete('/users/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
-// --- Admin password change (тот же bcrypt, инвалидация старых токенов) ---
 
 router.post('/users/:id/password', async (req: AuthRequest, res, next) => {
   try {
@@ -939,7 +922,6 @@ router.post('/users/:id/password', async (req: AuthRequest, res, next) => {
     const passwordHash = await bcrypt.hash(data.password, 12);
     await prisma.user.update({
       where: { id: existing.id },
-      // passwordChangedAt отклоняет все токены, выпущенные раньше (см. authMiddleware).
       data: { passwordHash, passwordChangedAt: new Date() },
     });
     await logAction(req, 'USER_PASSWORD_CHANGED', existing.id, `Пароль изменён администратором: ${existing.email}`);
@@ -1067,7 +1049,6 @@ router.delete('/tasks/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
-// --- Global search (backend, с лимитами — всю БД во frontend не тянем) ---
 
 router.get('/search', async (req, res, next) => {
   try {
@@ -1103,7 +1084,6 @@ router.get('/search', async (req, res, next) => {
   }
 });
 
-// --- Impersonation log (сам просмотр — read-only, данные через /tasks?userId=) ---
 
 router.post('/users/:id/impersonate', async (req: AuthRequest, res, next) => {
   try {
@@ -1173,7 +1153,6 @@ router.patch('/errors/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
-// --- Broadcast notifications (существующая модель Notification) ---
 
 router.post('/notifications', async (req: AuthRequest, res, next) => {
   try {
@@ -1201,7 +1180,6 @@ router.post('/notifications', async (req: AuthRequest, res, next) => {
     }
     if (!targets.length) throw new AppError(400, 'Нет получателей');
 
-    // Пакетами, чтобы не превышать лимиты драйвера.
     const BATCH = 500;
     for (let i = 0; i < targets.length; i += BATCH) {
       await prisma.notification.createMany({
@@ -1224,7 +1202,6 @@ router.post('/notifications', async (req: AuthRequest, res, next) => {
 router.get('/notifications', async (req, res, next) => {
   try {
     const q = pageSchema.parse(req.query);
-    // История рассылок: группируем по заголовку+тексту+времени создания.
     const groups = await prisma.notification.groupBy({
       by: ['title', 'body', 'type', 'createdAt'],
       where: { type: 'ADMIN_BROADCAST' },
@@ -1254,7 +1231,6 @@ router.get('/notifications', async (req, res, next) => {
   }
 });
 
-// --- Feature flags (только реальные возможности) ---
 
 const KNOWN_FLAGS: { key: string; description: string }[] = [
   { key: 'AI_ASSISTANT', description: 'AI-помощник: разбор задач, приоритеты, план дня (/ai/*)' },

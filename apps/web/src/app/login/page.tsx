@@ -19,7 +19,6 @@ function LoginContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [maintenanceMsg, setMaintenanceMsg] = useState('');
 
-  // Баннер техрежима: вход (особенно админу) остаётся доступен.
   useEffect(() => {
     let alive = true;
     api

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Search, User, ListTodo, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 
-/** Глобальный поиск: пользователи + задачи через backend, debounce, группировка. */
 export function GlobalSearch({
   onOpenUser,
   onOpenTask,

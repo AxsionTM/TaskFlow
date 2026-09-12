@@ -30,7 +30,6 @@ export function TaskCard({
   flat?: boolean;
   ringColor?: string;
 }) {
-  // Экшены без подписки: карточка рендерится только по props от родителя.
   const setSelectedTask = useTasksStore.getState().setSelectedTask;
   const completeTask = useTasksStore.getState().completeTask;
   const color =

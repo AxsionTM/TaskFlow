@@ -7,7 +7,6 @@ import { AppError } from '../../common/middleware/error-handler';
 const router = Router();
 const AI_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
-// Флаг AI_ASSISTANT (управляется из админки). Кэш 30 секунд.
 let aiFlagCache: { value: boolean; at: number } | null = null;
 
 async function isAiEnabled(): Promise<boolean> {
@@ -28,7 +27,6 @@ async function assertAiEnabled() {
   }
 }
 
-/** Сброс кэша флага — вызывается из админки после изменения. */
 export function invalidateAiFlagCache() {
   aiFlagCache = null;
 }
@@ -167,7 +165,6 @@ router.post('/day-plan', async (req: AuthRequest, res, next) => {
 router.post('/productivity', async (req: AuthRequest, res, next) => {
   try {
     await assertAiEnabled();
-    // Сырой body наружу не отправляем: только известные поля с лимитами.
     const data = z
       .object({
         tasks: z.array(aiTaskItemSchema).max(200).optional(),

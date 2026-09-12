@@ -30,7 +30,6 @@ export function GlobalQuickAdd() {
       }
     };
 
-    // Мобильная кнопка «+» в нижней навигации.
     const onQuickAdd = () => setOpen(true);
 
     window.addEventListener('keydown', onKey);

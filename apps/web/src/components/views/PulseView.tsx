@@ -46,7 +46,6 @@ export function PulseView() {
     return Math.max(0, Math.min(100, raw));
   }, [completedCount, overdue, today, open]);
 
-  // Активность: выполненные задачи по дням из completedAt
   const activity = useMemo(() => {
     const doneByDay = new Map<string, number>();
     for (const t of tasks as any[]) {

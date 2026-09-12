@@ -15,8 +15,6 @@ export function OverdueView() {
     fetchToday();
   }, [fetchOverdue, fetchToday]);
 
-  // Автоудаление: задача живёт в «Просроченных» 24 часа, затем уходит в корзину.
-  // Счётчик истории сохраняется отдельно и не теряется после удаления.
   useEffect(() => {
     if (!overdueTasks.length || cleaning) return;
     const expired = trackOverdueSeen(overdueTasks);

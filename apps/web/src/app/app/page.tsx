@@ -58,8 +58,6 @@ export default function AppPage() {
     checkAuth();
   }, [checkAuth]);
 
-  // Централизованное событие maintenance от API-клиента: показываем страницу
-  // сразу при первом 503, не дожидаясь следующих запросов.
   useEffect(() => {
     const onMaintenance = (e: Event) => {
       const message = (e as CustomEvent).detail?.message || 'Технические работы';
@@ -72,8 +70,6 @@ export default function AppPage() {
     return () => window.removeEventListener('tf:maintenance', onMaintenance);
   }, []);
 
-  // Независимая проверка техрежима напрямую с backend (не только через /me):
-  // переживает кэши инстансов и срабатывает сразу после refresh.
   useEffect(() => {
     let alive = true;
     api
@@ -107,8 +103,6 @@ export default function AppPage() {
     );
   }
 
-  // Режим обслуживания включается на backend — обычные пользователи видят
-  // этот экран, администраторы продолжают работать (их запросы не блокируются).
   if (maintenance && user?.role !== 'ADMIN') {
     return (
       <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#070a12] p-6 text-center text-white">

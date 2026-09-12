@@ -20,7 +20,6 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ) {
-  // Переполнение body (entity.too.large) — клиентская ошибка 413, а не 500.
   if ((err as any)?.type === 'entity.too.large') {
     return res.status(413).json({
       error: { message: 'Запрос слишком большой', code: 'PAYLOAD_TOO_LARGE' },

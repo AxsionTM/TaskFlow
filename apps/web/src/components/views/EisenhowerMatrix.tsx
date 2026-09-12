@@ -228,13 +228,12 @@ export function EisenhowerMatrix() {
     return map;
   }, [allTasks]);
 
-  // Телефон: один квадрант за раз с переключателем (все 4 остаются доступны).
   const [mobileQuad, setMobileQuad] = useState<Quadrant>('do');
 
   return (
     <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-4">
       <div className="grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1fr)_280px] items-start">
-        {/* Мобильный переключатель квадрантов */}
+        {}
         <div className="grid grid-cols-2 gap-2 lg:hidden" role="tablist" aria-label="Квадранты матрицы">
           {QUADRANTS.map((q) => (
             <button
@@ -309,7 +308,7 @@ export function EisenhowerMatrix() {
           })}
         </div>
 
-        {/* Правая колонка — как в референсе */}
+        {}
         <div className="flex min-w-0 flex-col gap-3">
           <div className="tf-glass rounded-3xl p-4">
             <div className="mb-3 text-[13px] font-semibold">Статистика матрицы</div>

@@ -29,8 +29,6 @@ export default function AdminPage() {
     );
   }
 
-  // Frontend-гейт — только для UX. Настоящая проверка роли выполняется
-  // на backend в каждом /admin/* endpoint (requireAdmin).
   if (user && user.role !== 'ADMIN') {
     return (
       <div className="tf-admin flex min-h-screen flex-col items-center justify-center gap-4 bg-[#070a12] p-6 text-center text-white">

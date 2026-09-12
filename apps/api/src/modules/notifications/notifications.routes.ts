@@ -6,7 +6,6 @@ import { AuthRequest } from '../../common/middleware/auth';
 
 const router = Router();
 
-// Все endpoints — только свои уведомления (userId из сессии, не из body).
 router.get('/unread-count', async (req: AuthRequest, res, next) => {
   try {
     const count = await prisma.notification.count({

@@ -5,11 +5,6 @@ import { Eye, X, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Skeleton } from './ui';
 
-/**
- * Read-only просмотр аккаунта (View as User).
- * Только чтение: никаких кнопок действий, только список задач пользователя.
- * Открытие записывается в Audit Log на backend.
- */
 export function ImpersonateView({
   userId,
   userEmail,

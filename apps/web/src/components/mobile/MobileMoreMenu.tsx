@@ -34,7 +34,6 @@ const TILES: { id: string; label: string; icon: any; mode?: DisplayMode }[] = [
   { id: 'profile', label: 'Профиль', icon: User },
 ];
 
-/** Мобильное меню «Ещё»: bottom sheet с сеткой разделов как в референсе. */
 export function MobileMoreMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { currentView, displayMode, setCurrentView, setCurrentProject, setDisplayMode } = useTasksStore();
 
@@ -45,7 +44,6 @@ export function MobileMoreMenu({ open, onClose }: { open: boolean; onClose: () =
     setCurrentProject(null);
     if (tile.mode) setDisplayMode(tile.mode);
     else if (tile.id !== 'today') {
-      // Списки разделов удобнее читать списком, а не канбаном.
       if (displayMode !== 'list') setDisplayMode('list');
     }
     onClose();

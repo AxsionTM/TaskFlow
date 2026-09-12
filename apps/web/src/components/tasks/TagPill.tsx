@@ -3,7 +3,6 @@
 import { cn } from '@/lib/utils';
 import { TagIcon } from '@/components/tasks/TagIcon';
 
-/** Неоновый овал тега: цветное свечение + контурная иконка */
 export function TagPill({ tag, className }: { tag: any; className?: string }) {
   if (!tag) return null;
   const color = tag.color || '#888888';

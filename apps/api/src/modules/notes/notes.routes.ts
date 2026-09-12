@@ -20,7 +20,6 @@ const contentSchema = z
   .max(NOTE_MAX_LENGTH, `Заметка слишком большая (максимум ${NOTE_MAX_LENGTH} символов)`)
   .refine((s) => s.trim().length > 0, 'Заметка не может быть пустой');
 
-// Задача должна существовать, принадлежать пользователю и не быть в корзине.
 async function requireOwnTask(userId: string, taskId: string) {
   const task = await prisma.task.findFirst({
     where: { id: taskId, creatorId: userId, isDeleted: false },
@@ -32,7 +31,6 @@ async function requireOwnTask(userId: string, taskId: string) {
   return task;
 }
 
-// GET /notes — только превью, без тяжёлых текстов.
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
     const notes = await prisma.note.findMany({
@@ -65,7 +63,6 @@ router.get('/', async (req: AuthRequest, res, next) => {
   }
 });
 
-// GET /notes/:id — полный текст, строго свой.
 router.get('/:id', async (req: AuthRequest, res, next) => {
   try {
     const note = await prisma.note.findFirst({
@@ -81,7 +78,6 @@ router.get('/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
-// GET /notes/by-task/:taskId — заметка конкретной задачи (для кнопки «Заметка»).
 router.get('/by-task/:taskId', async (req: AuthRequest, res, next) => {
   try {
     await requireOwnTask(req.userId!, req.params.taskId);
@@ -94,7 +90,6 @@ router.get('/by-task/:taskId', async (req: AuthRequest, res, next) => {
   }
 });
 
-// POST /notes — одна задача = максимум одна заметка.
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const data = z
@@ -127,7 +122,6 @@ router.post('/', async (req: AuthRequest, res, next) => {
   }
 });
 
-// PUT /notes/:id — только своё.
 router.put('/:id', async (req: AuthRequest, res, next) => {
   try {
     const data = z.object({ content: contentSchema }).parse(req.body);
@@ -148,7 +142,6 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
-// DELETE /notes/:id — удаляется только заметка, задача остаётся.
 router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
     const existing = await prisma.note.findFirst({

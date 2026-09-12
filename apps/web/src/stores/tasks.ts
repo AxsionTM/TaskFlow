@@ -99,10 +99,6 @@ function matchesOverdueFilter(task: Task): boolean {
   return new Date(task.dueDate).getTime() < start.getTime();
 }
 
-// Свежие мутации: GET сразу после POST/DELETE на Vercel может вернуть
-// stale-список (serverless cold start / lag / гонка фоновых refresh).
-// Держим их 15 секунд и подмешиваем в ответы, чтобы тихая сверка
-// не стирала только что созданное и не возвращала удаленное.
 const MUTATION_TTL_MS = 15000;
 const recentMutations = new Map<string, { task: Task | null; ts: number }>();
 
@@ -181,7 +177,6 @@ function saveOverdueHistory(h: { autoRemoved: number; lastAt: string | null }) {
   } catch {}
 }
 
-/** Отмечает просроченные как «увиденные», возвращает id задач старше 24ч для автоудаления */
 export function trackOverdueSeen(tasks: Task[]): string[] {
   if (typeof window === 'undefined') return [];
   const seen = loadOverdueSeen();
@@ -213,9 +208,6 @@ export function recordOverdueAutoRemoved(count: number) {
   });
 }
 
-// Дедуплика параллельных одинаковых запросов: Sidebar и вид монтируются
-// одновременно и раньше слали два одинаковых GET (например fetchOverdue).
-// Повторный вызов, пока летит первый, ждёт тот же promise.
 const inflight = new Map<string, Promise<void>>();
 
 function deduped<T extends unknown[]>(key: string, fn: (...args: T) => Promise<void>) {
@@ -347,8 +339,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         : undefined;
 
     // Calendar always shows all open tasks for the month (not only today).
-    // Календарь — отдельная вкладка (currentView), старый режим displayMode
-    // оставлен для совместимости.
     if (displayMode === "calendar" || currentView === "calendar") {
       await fetchTasks(
         {
@@ -443,9 +433,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   },
 
   createTask: async (data) => {
-    // Настоящий optimistic: показываем СРАЗУ, не дожидаясь ответа API.
-    // На Vercel (3 отдельных проекта) POST может идти секунды из-за
-    // cold start — раньше задача появлялась только после перезагрузки.
     const isSubtask = Boolean(data.parentId);
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const tempTask = {
@@ -476,7 +463,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       rememberMutation(task.id, task as Task);
 
       if (!task.parentId) {
-        // Меняем временную карточку на настоящую с сервера.
         set((state) => {
           const swap = (items: Task[], shouldAdd: boolean) => {
             if (items.some((entry) => entry.id === tempId)) {
@@ -495,11 +481,9 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         });
       }
 
-      // Тихая сверка с сервером без спиннера.
       await get().refreshCurrentView({ silent: true }).catch(() => {});
       return task;
     } catch (e) {
-      // Откат временной карточки, чтобы не было "призраков".
       if (!isSubtask) {
         set((state) => ({
           tasks: state.tasks.filter((entry) => entry.id !== tempId),
@@ -512,7 +496,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   },
 
   updateTask: async (id, data) => {
-    // Optimistic сразу, затем подтверждение с сервера.
     const snap = { tasks: get().tasks, todayTasks: get().todayTasks, overdueTasks: get().overdueTasks };
     set((state) => ({
       tasks: state.tasks.map((item) => (item.id === id ? { ...item, ...data } : item)),
@@ -571,7 +554,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   },
 
   deleteTask: async (id) => {
-    // Удаляем из UI мгновенно, запрос на сервер идет следом.
     const { selectedTaskId } = get();
     const snap = { tasks: get().tasks, todayTasks: get().todayTasks, overdueTasks: get().overdueTasks };
 
@@ -586,7 +568,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       await api.deleteTask(id);
       rememberMutation(id, null);
     } catch (e) {
-      // Откат, если сервер отклонил удаление (например CORS/сеть на Vercel).
       set(snap);
       throw e;
     }

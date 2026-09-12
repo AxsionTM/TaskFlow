@@ -118,7 +118,6 @@ export function CalendarView() {
 
   const headerLabel = format(cursor, 'LLLL yyyy', { locale: ru });
 
-  // Ближайшие события: только будущие, без просроченных, без выполненных
   const upcoming = useMemo(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -133,7 +132,7 @@ export function CalendarView() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* Header — как в референсе, но без переключателей Месяц/Неделя/День */}
+      {}
       <div className="tf-view-header flex items-center gap-3 px-4 sm:px-6 py-3 border-b">
         <span className="hidden sm:flex h-9 w-9 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
           <CalendarDays className="h-4.5 w-4.5" />
@@ -158,7 +157,7 @@ export function CalendarView() {
 
       <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex min-h-0 min-w-0 flex-col">
-          {/* Month grid — полноценный месячный календарь */}
+          {}
           <div className="calendar-scroll flex-1 overflow-auto p-2 sm:p-4">
             <div className="tf-glass rounded-3xl p-2 sm:p-3">
               <div className="tf-cal-head grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
@@ -229,7 +228,7 @@ export function CalendarView() {
                         </div>
                       )}
 
-                      {/* Задачи дня — фиксированная область с внутренним скроллом */}
+                      {}
                       <div className="tf-cal-tasks mt-1 flex-1 min-h-0 space-y-1 overflow-y-auto overscroll-contain pr-0.5">
                         {bdayPeople.slice(0, 1).map((b) => (
                           <div
@@ -290,7 +289,7 @@ export function CalendarView() {
               </div>
             </div>
 
-            {/* Ближайшие события — только будущие, с иконкой и стрелкой */}
+            {}
             <div className="tf-glass mx-auto mt-3 max-w-5xl rounded-3xl p-3 sm:p-4">
               <div className="mb-2.5 flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">

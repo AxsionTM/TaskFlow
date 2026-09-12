@@ -7,8 +7,6 @@ import { importLimiter } from '../../common/middleware/rate-limits';
 
 const router = Router();
 
-// Лимиты импорта: stored-only ZIP (без распаковки — zip-bomb невозможен
-// через декомпрессию), плюс жёсткие крышки на количество и размеры.
 const MAX_IMPORT_ENTRIES = 2000;
 const MAX_ENTRY_BYTES = 1 * 1024 * 1024;
 const MAX_IMPORTED_TASKS = 2000;

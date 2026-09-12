@@ -16,7 +16,6 @@ function daysUntilBirthday(iso: string, from: Date): number {
   return Math.round((next.getTime() - start.getTime()) / 86400000);
 }
 
-/** Быстрый просмотр: просроченные, входящие, дни рождения, привычки */
 export function QuickGlance() {
   const { overdueTasks, setCurrentView } = useTasksStore();
   const { items: birthdays, fetch: fetchBirthdays } = useBirthdaysStore();
@@ -111,7 +110,6 @@ export function QuickGlance() {
   );
 }
 
-/** Мини-календарь месяца. Клик по дню выбирает дату. */
 export function MiniCalendar({
   value,
   onSelect,
@@ -217,7 +215,6 @@ export function MiniCalendar({
   );
 }
 
-/** Ближайшие дни рождения */
 export function UpcomingBirthdays({ limit = 3 }: { limit?: number }) {
   const { items, fetch } = useBirthdaysStore();
   const { setCurrentView } = useTasksStore();

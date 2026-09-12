@@ -1,6 +1,5 @@
 import { prisma } from './prisma';
 
-/** Вычищаем секреты из сообщений/стеков перед записью в БД. */
 export function sanitizeErrorText(input: string): string {
   return input
     .replace(/(password["'\s:=]+)([^\s"',}]+)/gi, '$1[redacted]')
@@ -10,10 +9,6 @@ export function sanitizeErrorText(input: string): string {
     .slice(0, 2000);
 }
 
-/**
- * Группирующая запись ошибки (fire-and-forget, никогда не бросает).
- * Вызывается только для 5xx из глобального errorHandler.
- */
 export function recordError(input: {
   endpoint: string;
   method: string;
@@ -27,7 +22,6 @@ export function recordError(input: {
   void (async () => {
     try {
       const now = new Date();
-      // Дедуплика за последние 24ч: наращиваем счётчик вместо новой строки.
       const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       const existing = await prisma.errorLog.findFirst({
         where: {
@@ -57,7 +51,6 @@ export function recordError(input: {
         },
       });
     } catch {
-      // Логирование ошибок не должно ломать ответы API.
     }
   })();
 }

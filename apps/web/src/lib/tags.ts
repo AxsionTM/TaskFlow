@@ -9,7 +9,6 @@ export const TAG_COLORS = [
   '#fb7185',
 ];
 
-/** Ключи lucide-иконок для тегов (контурные, без эмодзи) */
 export const TAG_ICONS = [
   'briefcase',
   'dumbbell',
@@ -41,7 +40,6 @@ export function randomTagColor(): string {
   return TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)];
 }
 
-/** Название тега без иконки (иконка рисуется компонентом TagIcon) */
 export function tagLabel(tag: { name?: string } | null | undefined): string {
   return tag?.name || '';
 }

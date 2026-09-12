@@ -9,10 +9,6 @@ interface CheckboxProps {
   onCheckedChange?: (checked: boolean) => void;
   className?: string;
   priority?: string;
-  /**
-   * ghost: прозрачный круг-кольцо как в дизайне — только цветной ободок
-   * и цветная галочка, без заливки внутри.
-   */
   ghost?: boolean;
   size?: 'sm' | 'md';
 }

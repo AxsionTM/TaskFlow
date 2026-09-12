@@ -1,8 +1,3 @@
-/**
- * Cloudflare Turnstile: ТОЛЬКО server-side verification.
- * Secret key живёт только в env backend и никогда не уходит во frontend
- * (туда отдаётся лишь NEXT_PUBLIC_TURNSTILE_SITE_KEY).
- */
 
 const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 const TIMEOUT_MS = 8000;
@@ -18,8 +13,6 @@ function secret(): string {
 export type TurnstileResult = { ok: true } | { ok: false; error: string };
 
 export async function verifyTurnstileToken(token: string | undefined, ip?: string): Promise<TurnstileResult> {
-  // Ключи не настроены: локальная разработка без капчи (с предупреждением
-  // при старте). В production ключи обязательны — см. env-валидацию.
   if (!isTurnstileConfigured()) {
     return { ok: true };
   }
@@ -38,7 +31,6 @@ export async function verifyTurnstileToken(token: string | undefined, ip?: strin
     if (data.success) return { ok: true };
     return { ok: false, error: 'Подтвердите, что вы не робот' };
   } catch {
-    // Cloudflare недоступен: безопасно отклоняем (fail-closed при настроенных ключах).
     return { ok: false, error: 'Проверка временно недоступна. Попробуйте позже.' };
   }
 }

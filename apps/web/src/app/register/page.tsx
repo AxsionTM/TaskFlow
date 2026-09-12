@@ -39,7 +39,6 @@ export default function RegisterPage() {
       router.push(`/verify?email=${encodeURIComponent(registeredEmail)}`);
     } catch (err: any) {
       setError(err.message || 'Ошибка регистрации');
-      // Сбрасываем капчу после неудачи, чтобы бот не переиспользовал токен.
       setTurnstileToken('');
     } finally {
       setIsLoading(false);

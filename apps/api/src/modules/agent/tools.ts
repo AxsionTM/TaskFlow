@@ -1,9 +1,3 @@
-/**
- * Инструменты AI-агента. Каждый выполняется на backend с userId из JWT:
- * все запросы scoped по владельцу, чужие данные недоступны по построению.
- * LLM никогда не получает userId и не может его подменить — параметра
- * userId нет ни в одной схеме.
- */
 import { prisma } from '../../common/utils/prisma';
 import { AppError } from '../../common/middleware/error-handler';
 import { dayKeyInTz, formatInTz } from './nl-dates';
@@ -84,7 +78,6 @@ async function findTask(userId: string, taskId: string, full = false) {
   return task;
 }
 
-/** Поиск задачи по названию (нечёткий, регистронезависимый). */
 async function searchTasksByTitle(userId: string, query: string, limit = 10) {
   const q = query.trim();
   if (!q) return [];

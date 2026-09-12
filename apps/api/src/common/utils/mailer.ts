@@ -36,12 +36,6 @@ const SUBJECTS = {
   reset: 'TaskFlow — код восстановления пароля',
 } as const;
 
-/**
- * Отправка кода. Возвращает { sent: true } при реальной отправке через SMTP.
- * Если SMTP не настроен и окружение не production — код пишется в лог,
- * а сам код возвращается в поле devCode, чтобы flow можно было
- * протестировать локально без почтового сервера.
- */
 export async function sendVerificationCode({
   to,
   code,

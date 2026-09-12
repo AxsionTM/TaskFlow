@@ -17,7 +17,6 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 
-/** Колокольчик с бейджем + dropdown. Данные только с backend (переживают refresh). */
 export function NotificationCenter({ dark = false }: { dark?: boolean }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<any[]>([]);
@@ -42,7 +41,6 @@ export function NotificationCenter({ dark = false }: { dark?: boolean }) {
 
   useEffect(() => {
     void refresh(true);
-    // Лёгкий опрос + обновление при возврате на вкладку (без спама запросами).
     const id = setInterval(() => void refresh(true), 60000);
     const onFocus = () => void refresh(true);
     window.addEventListener('focus', onFocus);

@@ -216,7 +216,7 @@ export function NotesView() {
 
   return (
     <div className="flex min-h-0 flex-1">
-      {/* Список */}
+      {}
       <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col', editorOpen && 'hidden lg:flex')}>
         <div className="tf-view-header flex shrink-0 items-center gap-2 border-b px-4 py-3">
           <h1 className="mr-auto text-lg font-semibold">Мои заметки</h1>
@@ -276,7 +276,7 @@ export function NotesView() {
         </div>
       </div>
 
-      {/* Редактор: справа на десктопе, отдельным экраном на мобильном */}
+      {}
       {editorOpen && (
         <div className="tf-note-panel flex min-h-0 min-w-0 flex-1 flex-col border-border/50 bg-card/40 backdrop-blur lg:max-w-md lg:border-l">
           <NoteEditor
@@ -288,8 +288,6 @@ export function NotesView() {
               clearPendingTask();
             }}
             onSaved={(note) => {
-              // После сохранения — всегда назад в общее меню заметок,
-              // а не зависший экран редактирования.
               upsertPreview(note);
               setSelectedNote(null);
               clearPendingTask();
