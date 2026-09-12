@@ -8,6 +8,8 @@ import { useGoalsStore } from '@/stores/goals';
 import { useFocusStore } from '@/stores/focus';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { CreateTaskModal } from '@/components/tasks/CreateTaskModal';
+import { BirthdayCards } from '@/components/birthdays/BirthdayCards';
+import { mergeWithOccurrences } from '@/lib/recurrence';
 import { Loader2 } from 'lucide-react';
 
 function Tile({
@@ -43,7 +45,7 @@ function Tile({
 }
 
 export function TodayDashboard() {
-  const { todayTasks, isLoading, setCurrentView } = useTasksStore();
+  const { todayTasks, recurringTasks, fetchRecurring, isLoading, setCurrentView } = useTasksStore();
   const { habits, fetchHabits } = useHabitsStore();
   const { goals, fetchGoals } = useGoalsStore();
   const { sessions, fetchStats, fetchSessions } = useFocusStore();
@@ -54,7 +56,17 @@ export function TodayDashboard() {
     fetchGoals();
     fetchStats();
     fetchSessions();
-  }, [fetchHabits, fetchGoals, fetchStats, fetchSessions]);
+    fetchRecurring();
+  }, [fetchHabits, fetchGoals, fetchStats, fetchSessions, fetchRecurring]);
+
+  const visibleTasks = useMemo(() => {
+    const key = new Date();
+    const y = key.getFullYear();
+    const m = String(key.getMonth() + 1).padStart(2, '0');
+    const d = String(key.getDate()).padStart(2, '0');
+    const dayKey = `${y}-${m}-${d}`;
+    return mergeWithOccurrences(todayTasks, recurringTasks, dayKey, dayKey);
+  }, [todayTasks, recurringTasks]);
 
   const taskScore = (t: any): number => {
     const kids = (t.children || []).filter((c: any) => !c.isDeleted);
@@ -63,11 +75,11 @@ export function TodayDashboard() {
     }
     return t.status === 'COMPLETED' ? 1 : 0;
   };
-  const done = todayTasks.filter((t) => t.status === 'COMPLETED').length;
-  const total = todayTasks.length;
+  const done = visibleTasks.filter((t) => t.status === 'COMPLETED').length;
+  const total = visibleTasks.length;
   const progress =
     total > 0
-      ? Math.round((todayTasks.reduce((s: number, t) => s + taskScore(t), 0) / total) * 100)
+      ? Math.round((visibleTasks.reduce((s: number, t) => s + taskScore(t), 0) / total) * 100)
       : 0;
   const ring = 2 * Math.PI * 52;
 
@@ -131,18 +143,21 @@ export function TodayDashboard() {
                 Добавить задачу
               </button>
             </div>
+            <div className="mb-2">
+              <BirthdayCards />
+            </div>
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : todayTasks.length === 0 ? (
+            ) : visibleTasks.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-14 text-muted-foreground">
                 <p className="text-sm">Нет задач</p>
                 <p className="text-xs mt-1">Добавьте первую задачу кнопкой выше</p>
               </div>
             ) : (
               <div className="mt-1 divide-y divide-[hsl(var(--primary)/0.14)]">
-                {todayTasks.map((task) => (
+                {visibleTasks.map((task) => (
                   <TaskCard key={task.id} task={task} flat />
                 ))}
               </div>

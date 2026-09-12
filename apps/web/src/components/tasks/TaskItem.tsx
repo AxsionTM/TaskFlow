@@ -1,5 +1,6 @@
 'use client';
 
+import { occurrenceBaseId } from '@/lib/recurrence';
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn, formatDate } from '@/lib/utils';
@@ -18,7 +19,7 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
   const currentView = useTasksStore((s) => s.currentView);
   const setSelectedTask = useTasksStore.getState().setSelectedTask;
   const completeTask = useTasksStore.getState().completeTask;
-  const isSelected = selectedTaskId === task.id;
+  const isSelected = selectedTaskId === occurrenceBaseId(task);
   const now = new Date();
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);

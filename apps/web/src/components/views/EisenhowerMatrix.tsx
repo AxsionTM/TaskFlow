@@ -1,5 +1,6 @@
 'use client';
 
+import { occurrenceBaseId } from '@/lib/recurrence';
 import { useMemo, useState } from 'react';
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -90,7 +91,7 @@ function MatrixCard({ task }: { task: any }) {
   const selectedTaskId = useTasksStore((s) => s.selectedTaskId);
   const setSelectedTask = useTasksStore.getState().setSelectedTask;
   const completeTask = useTasksStore.getState().completeTask;
-  const isSelected = selectedTaskId === task.id;
+  const isSelected = selectedTaskId === occurrenceBaseId(task);
   const done = task.status === 'COMPLETED';
   const meta = PRIORITY_META[task.priority] || PRIORITY_META.NONE;
 

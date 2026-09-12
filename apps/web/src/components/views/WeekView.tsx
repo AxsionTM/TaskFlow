@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useTasksStore } from '@/stores/tasks';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { plural } from '@/components/views/TomorrowView';
 import { TagIcon } from '@/components/tasks/TagIcon';
+import { mergeWithOccurrences } from '@/lib/recurrence';
 
 interface DayGroup {
   key: string;
@@ -14,11 +15,25 @@ interface DayGroup {
 }
 
 export function WeekView() {
-  const { tasks, isLoading } = useTasksStore();
+  const { tasks, recurringTasks, fetchRecurring, isLoading } = useTasksStore();
+
+  useEffect(() => {
+    fetchRecurring();
+  }, [fetchRecurring]);
+
+  const weekTasks = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
+    const keyOf = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return mergeWithOccurrences(tasks, recurringTasks, keyOf(start), keyOf(end));
+  }, [tasks, recurringTasks]);
 
   const groups = useMemo<DayGroup[]>(() => {
     const map = new Map<string, DayGroup>();
-    for (const task of tasks) {
+    for (const task of weekTasks) {
       const raw = task.startDate || task.dueDate;
       const key = raw
         ? new Date(raw).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -33,16 +48,16 @@ export function WeekView() {
       if (!b.date) return -1;
       return a.date.getTime() - b.date.getTime();
     });
-  }, [tasks]);
+  }, [weekTasks]);
 
-  const done = tasks.filter((t: any) => t.status === 'COMPLETED').length;
-  const total = tasks.length;
+  const done = weekTasks.filter((t: any) => t.status === 'COMPLETED').length;
+  const total = weekTasks.length;
   const progress = total > 0 ? done / total : 0;
   const ring = 2 * Math.PI * 52;
 
   const tagStats = useMemo(() => {
     const map = new Map<string, { name: string; color: string; icon?: string | null; done: number; total: number }>();
-    for (const t of tasks as any[]) {
+    for (const t of weekTasks as any[]) {
       const tags = t.tags?.length ? t.tags : [{ tag: { name: t.project?.name || 'Без тега', color: t.project?.color || '#888888' } }];
       for (const tt of tags) {
         const name = tt.tag?.name || 'Без тега';
@@ -55,7 +70,7 @@ export function WeekView() {
       }
     }
     return Array.from(map.values());
-  }, [tasks]);
+  }, [weekTasks]);
 
   const start = new Date();
   start.setHours(0, 0, 0, 0);

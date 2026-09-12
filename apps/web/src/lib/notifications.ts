@@ -8,14 +8,21 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return result === 'granted';
 }
 
-export function showNotification(title: string, options?: NotificationOptions) {
+import { playNotifySound, type NotifySoundId } from './notifySound';
+
+export function showNotification(
+  title: string,
+  options?: NotificationOptions & { sound?: NotifySoundId }
+) {
   if (typeof window === 'undefined' || !('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
+  const { sound, ...rest } = options || {};
   try {
     new Notification(title, {
       icon: '/logo-tf.png',
-      ...options,
+      ...rest,
     });
+    playNotifySound(sound);
   } catch {
     // ignore
   }
@@ -44,33 +51,57 @@ export function notifyDueTasks(overdue: any[], today: any[]) {
   sessionStorage.setItem(key, '1');
 }
 
-/** Local schedule: fire when dueDate - offset is reached (client-side). */
+/** Resolve fire times for a task: explicit server reminders + sensible defaults. */
+export function reminderFireTimes(t: any): number[] {
+  if (!t || t.status === 'COMPLETED') return [];
+  const times: number[] = [];
+  // Tasks may have only startDate (end time removed) — notify on it as well.
+  const anchorRaw = t.dueDate || t.startDate;
+  const due = anchorRaw ? new Date(anchorRaw).getTime() : NaN;
+  if (Array.isArray(t.reminders)) {
+    for (const r of t.reminders) {
+      if (r?.isSent) continue;
+      const at = new Date(r.remindAt).getTime();
+      if (!Number.isNaN(at) && !times.includes(at)) times.push(at);
+    }
+  }
+  if (!Number.isNaN(due)) {
+    // Defaults so tasks without explicit settings still notify.
+    if (!times.includes(due)) times.push(due);
+    const early = due - 15 * 60 * 1000;
+    if (!times.includes(early)) times.push(early);
+  }
+  return times.sort((a, b) => a - b);
+}
+
+/** Local schedule: fire when a fire time is reached (client-side). */
 export function checkLocalReminders(
   tasks: any[],
   fired: Set<string>,
-  markFired: (id: string) => void
+  markFired: (id: string) => void,
+  sound?: NotifySoundId
 ) {
   if (typeof window === 'undefined') return;
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
   const now = Date.now();
   for (const t of tasks) {
-    if (!t.dueDate || t.status === 'COMPLETED') continue;
-    const due = new Date(t.dueDate).getTime();
-    // Default: notify at due time and 15 min before if within window
-    const offsets = [0, 15 * 60 * 1000];
-    for (const off of offsets) {
-      const key = `${t.id}-${off}`;
+    if (t.status === 'COMPLETED') continue;
+    const anchorRaw = t.dueDate || t.startDate;
+    const due = anchorRaw ? new Date(anchorRaw).getTime() : NaN;
+    for (const at of reminderFireTimes(t)) {
+      const key = `${t.id}-${at}`;
       if (fired.has(key)) continue;
-      const at = due - off;
       // within last 60s window so polling every 30s catches it
       if (now >= at && now < at + 120_000) {
+        const mins = Number.isNaN(due) ? null : Math.round((due - at) / 60000);
         const when =
-          off === 0 ? 'Сейчас срок' : `Через ${Math.round(off / 60000)} мин срок`;
+          mins === null || mins <= 0 ? 'Сейчас срок' : `Через ${mins} мин срок`;
         showNotification(t.title, {
           body: when,
           tag: key,
-          requireInteraction: off === 0,
+          requireInteraction: mins === 0,
+          sound,
         });
         markFired(key);
       }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, type DragEvent } from 'react';
+import { useMemo, useState, useEffect, useRef, type DragEvent } from 'react';
 import {
   format,
   startOfMonth,
@@ -22,6 +22,7 @@ import {
   ChevronRight as ArrowRight,
   Cake,
   Flag,
+  Repeat,
 } from 'lucide-react';
 import { useTasksStore } from '@/stores/tasks';
 import { useBirthdaysStore, isSameMonthDay, ageFromDate } from '@/stores/birthdays';
@@ -30,7 +31,9 @@ import { useEffectsStore } from '@/stores/effects';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CreateTaskModal } from '@/components/tasks/CreateTaskModal';
+import { TaskCard } from '@/components/tasks/TaskCard';
 import { QuickGlance, MiniCalendar, UpcomingBirthdays } from '@/components/views/SidePanels';
+import { expandRecurrence, isOccurrence, taskSpanKeys } from '@/lib/recurrence';
 
 const PRIORITY_META: Record<string, { color: string; bg: string; label: string }> = {
   HIGH: { color: '#f87171', bg: 'rgba(239,68,68,.16)', label: 'Высокий' },
@@ -47,7 +50,7 @@ function timeLabel(iso?: string | null): string {
 }
 
 export function CalendarView() {
-  const { tasks, setSelectedTask, updateTask } = useTasksStore();
+  const { tasks, recurringTasks, fetchRecurring, setSelectedTask, updateTask } = useTasksStore();
   const { items: birthdays, fetch: fetchBirthdays } = useBirthdaysStore();
   const user = useAuthStore((s) => s.user);
   const effectsOn = useEffectsStore((s) => s.enabled);
@@ -55,12 +58,34 @@ export function CalendarView() {
   useEffect(() => {
     fetchBirthdays();
   }, [fetchBirthdays]);
+  useEffect(() => {
+    fetchRecurring();
+  }, [fetchRecurring]);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [cursor, setCursor] = useState(new Date());
   const [selectedKey, setSelectedKey] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [taskOpen, setTaskOpen] = useState(false);
+  const dayPanelRef = useRef<HTMLDivElement>(null);
 
-  const allTasks = useMemo(() => tasks, [tasks]);
+  const selectDay = (key: string, scroll = false) => {
+    setSelectedKey(key);
+    if (scroll) {
+      requestAnimationFrame(() => {
+        dayPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    }
+  };
+
+  const allTasks = useMemo(() => {
+    // Recurring series may be absent from the main list (view filters);
+    // merge them so every occurrence is expanded for the visible month.
+    const map = new Map<string, any>();
+    for (const t of tasks || []) map.set(t.id, t);
+    for (const t of recurringTasks || []) {
+      if (!map.has(t.id)) map.set(t.id, t);
+    }
+    return Array.from(map.values());
+  }, [tasks, recurringTasks]);
 
   const moveTaskToDate = async (taskId: string, dateKey: string) => {
     const day = new Date(dateKey + 'T12:00:00');
@@ -86,13 +111,33 @@ export function CalendarView() {
     await moveTaskToDate(taskId, key);
   };
 
+  const monthRange = useMemo(() => {
+    const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 });
+    const end = endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 });
+    return { from: format(start, 'yyyy-MM-dd'), to: format(end, 'yyyy-MM-dd') };
+  }, [cursor]);
+
   const tasksByDate = useMemo(() => {
     const map = new Map<string, any[]>();
-    for (const task of allTasks) {
-      if (!task.dueDate) continue;
-      const key = format(new Date(task.dueDate), 'yyyy-MM-dd');
+    const push = (key: string, task: any) => {
       if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(task);
+      const list = map.get(key)!;
+      if (!list.some((t) => t.id === task.id)) list.push(task);
+    };
+    for (const task of allTasks) {
+      if (task.status === 'COMPLETED') {
+        if (task.dueDate) push(format(new Date(task.dueDate), 'yyyy-MM-dd'), task);
+        continue;
+      }
+      const recurring = task.recurrenceType && task.recurrenceType !== 'NONE';
+      if (recurring) {
+        for (const occ of expandRecurrence(task, monthRange.from, monthRange.to)) {
+          push(occ.occurrenceDate, occ);
+        }
+        continue;
+      }
+      const spanKeys = taskSpanKeys(task);
+      for (const key of spanKeys) push(key, spanKeys.length > 1 ? { ...task, span: true } : task);
     }
     map.forEach((list) => {
       list.sort((a: any, b: any) => {
@@ -100,11 +145,13 @@ export function CalendarView() {
         const pa = order[a.priority] ?? 4;
         const pb = order[b.priority] ?? 4;
         if (pa !== pb) return pa - pb;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        const da = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+        const db = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+        return da - db;
       });
     });
     return map;
-  }, [allTasks]);
+  }, [allTasks, monthRange]);
 
   const navigate = (dir: -1 | 1) => {
     setCursor(dir === 1 ? addMonths(cursor, 1) : subMonths(cursor, 1));
@@ -187,7 +234,7 @@ export function CalendarView() {
                   return (
                     <div
                       key={key}
-                      onClick={() => setSelectedKey(key)}
+                      onClick={() => selectDay(key, true)}
                       onDragOver={(e) => onDragOverDay(e, key)}
                       onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
                       onDrop={(e) => onDropDay(e, key)}
@@ -243,13 +290,15 @@ export function CalendarView() {
                         {dayTasks.map((task) => {
                           const meta = PRIORITY_META[task.priority] || PRIORITY_META.NONE;
                           const done = task.status === 'COMPLETED';
+                          const occ = isOccurrence(task);
+                          const span = !occ && (task as any).span;
                           return (
                             <button
                               key={task.id}
-                              draggable
-                              onDragStart={(e) => onDragStart(e, task.id)}
-                              onClick={(e) => { e.stopPropagation(); setSelectedTask(task.id); }}
-                              title={`${task.title}${timeLabel(task.dueDate) ? ` · ${timeLabel(task.dueDate)}` : ''}`}
+                              draggable={!occ}
+                              onDragStart={(e) => onDragStart(e, occ ? (task as any).baseId : task.id)}
+                              onClick={(e) => { e.stopPropagation(); setSelectedTask(occ ? (task as any).baseId : task.id); }}
+                              title={`${task.title}${timeLabel(task.dueDate) ? ` · ${timeLabel(task.dueDate)}` : ''}${span ? ' · период' : ''}${occ ? ' · повтор' : ''}`}
                               className={cn(
                                 'flex w-full items-center gap-1.5 rounded-lg border px-1.5 py-[4px] text-left transition-all cursor-grab active:cursor-grabbing',
                                 'hover:brightness-125 hover:translate-x-[1px] active:scale-[0.98]',
@@ -259,13 +308,18 @@ export function CalendarView() {
                                 borderColor: `${meta.color}55`,
                                 background: done ? 'hsl(var(--muted) / .5)' : meta.bg,
                                 boxShadow: `0 0 12px -5px ${meta.color}88, inset 0 0 10px -8px ${meta.color}`,
+                                ...(span ? { borderLeftWidth: 3, borderLeftColor: meta.color } : {}),
                               }}
                             >
                               <span
                                 className="h-2 w-2 shrink-0 rounded-full"
                                 style={{ backgroundColor: meta.color, boxShadow: `0 0 8px -1px ${meta.color}` }}
                               />
-                              <Flag className="h-2.5 w-2.5 shrink-0" style={{ color: meta.color }} />
+                              {occ ? (
+                                <Repeat className="h-2.5 w-2.5 shrink-0" style={{ color: meta.color }} />
+                              ) : (
+                                <Flag className="h-2.5 w-2.5 shrink-0" style={{ color: meta.color }} />
+                              )}
                               <span className={cn('min-w-0 flex-1 truncate text-[10px] font-medium leading-tight', done && 'line-through text-muted-foreground')}>
                                 {task.title}
                               </span>
@@ -289,7 +343,72 @@ export function CalendarView() {
               </div>
             </div>
 
-            {}
+            <div ref={dayPanelRef} className="tf-glass mx-auto mt-3 max-w-5xl rounded-3xl p-3 sm:p-4 scroll-mt-2">
+              <div className="mb-2.5 flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-sm font-semibold capitalize">
+                  Задачи — {format(new Date(selectedKey + 'T12:00:00'), 'd MMMM', { locale: ru })}
+                </span>
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {(tasksByDate.get(selectedKey) || []).length}
+                </span>
+              </div>
+              {(() => {
+                const selectedTasks = tasksByDate.get(selectedKey) || [];
+                const selectedDay = new Date(selectedKey + 'T12:00:00');
+                const selectedBdays = birthdays.filter((b) => isSameMonthDay(b.date, selectedDay));
+                const userBday = user?.birthday && isSameMonthDay(String(user.birthday), selectedDay);
+                const isSelectedToday = selectedKey === format(new Date(), 'yyyy-MM-dd');
+                if (selectedTasks.length === 0 && selectedBdays.length === 0 && !userBday) {
+                  return (
+                    <p className="px-1 py-3 text-center text-xs text-muted-foreground">На этот день задач нет</p>
+                  );
+                }
+                return (
+                  <div className="max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-0.5">
+                    {selectedTasks.map((task: any) => (
+                      <TaskCard key={task.id} task={task} />
+                    ))}
+                    {selectedBdays.map((b) => (
+                      <div
+                        key={b.id}
+                        className="flex items-center gap-2.5 rounded-2xl border border-pink-400/40 bg-gradient-to-r from-pink-500/25 via-fuchsia-500/15 to-violet-500/25 px-3.5 py-3"
+                        style={{ boxShadow: '0 0 24px -8px rgba(236,72,153,.55), inset 0 0 18px -12px rgba(236,72,153,.6)' }}
+                      >
+                        <span className="shrink-0 text-2xl leading-none" aria-hidden>🎈🎂🎉</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block truncate text-[15px] font-bold text-pink-100">
+                            {isSelectedToday ? `Сегодня день рождения у ${b.name}!` : `День рождения у ${b.name}`}
+                          </span>
+                          <span className="block truncate text-xs text-pink-200/70">
+                            Исполняется {ageFromDate(b.date, selectedDay)} {b.note ? `· ${b.note}` : '· не забудьте поздравить'}
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                    {userBday && (
+                      <div
+                        className="flex items-center gap-2.5 rounded-2xl border border-pink-400/40 bg-gradient-to-r from-pink-500/25 via-fuchsia-500/15 to-violet-500/25 px-3.5 py-3"
+                        style={{ boxShadow: '0 0 24px -8px rgba(236,72,153,.55), inset 0 0 18px -12px rgba(236,72,153,.6)' }}
+                      >
+                        <span className="shrink-0 text-2xl leading-none" aria-hidden>🎈🎂🎉</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block truncate text-[15px] font-bold text-pink-100">
+                            {isSelectedToday ? 'Сегодня ваш день рождения!' : 'Ваш день рождения в этот день'}
+                          </span>
+                          <span className="block truncate text-xs text-pink-200/70">
+                            Поздравляем! Отличный день!
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
             <div className="tf-glass mx-auto mt-3 max-w-5xl rounded-3xl p-3 sm:p-4">
               <div className="mb-2.5 flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
@@ -351,14 +470,7 @@ export function CalendarView() {
               setSelectedKey(format(d, 'yyyy-MM-dd'));
               setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
             }}
-            taskKeys={new Set(allTasks.flatMap((t: any) => {
-              const keys: string[] = [];
-              for (const raw of [t.startDate, t.dueDate]) {
-                if (!raw) continue;
-                keys.push(format(new Date(raw), 'yyyy-MM-dd'));
-              }
-              return keys;
-            }))}
+            taskKeys={new Set(Array.from(tasksByDate.keys()))}
             birthdayKeys={new Set(birthdays.map((b: any) => {
               const d = new Date(b.date);
               return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

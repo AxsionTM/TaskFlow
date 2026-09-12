@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import { checkLocalReminders, showNotification } from '@/lib/notifications';
+import { getNotifySound } from '@/lib/notifySound';
+import { expandRecurrence } from '@/lib/recurrence';
 import { useTasksStore } from '@/stores/tasks';
 import { useBirthdaysStore, isSameMonthDay, ageFromDate } from '@/stores/birthdays';
 import { useAuthStore } from '@/stores/auth';
@@ -10,10 +12,12 @@ import { useAuthStore } from '@/stores/auth';
 export function ReminderWorker() {
   const firedRef = useRef<Set<string>>(new Set());
   const fetchBirthdays = useBirthdaysStore((s) => s.fetch);
+  const fetchRecurring = useTasksStore((s) => s.fetchRecurring);
 
   useEffect(() => {
     fetchBirthdays();
-  }, [fetchBirthdays]);
+    fetchRecurring();
+  }, [fetchBirthdays, fetchRecurring]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -23,6 +27,7 @@ export function ReminderWorker() {
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
       const state = useTasksStore.getState();
+      const sound = getNotifySound();
       const all = [...state.tasks, ...state.todayTasks, ...state.overdueTasks];
       const seen = new Set<string>();
       const unique = all.filter((t) => {
@@ -31,7 +36,22 @@ export function ReminderWorker() {
         return true;
       });
 
-      checkLocalReminders(unique, firedRef.current, (id) => firedRef.current.add(id));
+      // Recurring series also notify on their instances (today window).
+      try {
+        const now = new Date();
+        const keyOf = (d: Date) =>
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const todayKey = keyOf(now);
+        for (const t of state.recurringTasks || []) {
+          if (seen.has(t.id)) continue;
+          seen.add(t.id);
+          for (const occ of expandRecurrence(t, todayKey, todayKey)) {
+            if (!unique.some((u) => u.id === occ.id)) unique.push(occ);
+          }
+        }
+      } catch {}
+
+      checkLocalReminders(unique, firedRef.current, (id) => firedRef.current.add(id), sound);
 
       const birthdays = useBirthdaysStore.getState().items;
       const user = useAuthStore.getState().user;
@@ -52,6 +72,7 @@ export function ReminderWorker() {
           showNotification(`День рождения: ${b.name}`, {
             body: `${ageFromDate(b.date)} лет · ${b.note || 'Не забудьте поздравить!'}`,
             tag: key,
+            sound,
           });
           firedRef.current.add(key);
         }
@@ -63,6 +84,7 @@ export function ReminderWorker() {
           showNotification('С днём рождения!', {
             body: 'Пусть день будет продуктивным и приятным!',
             tag: key,
+            sound,
           });
           firedRef.current.add(key);
         }
@@ -79,6 +101,7 @@ export function ReminderWorker() {
               ? `Срок: ${new Date(r.task.dueDate).toLocaleString('ru-RU')}`
               : 'Пора выполнить задачу',
             tag: `reminder-${r.id}`,
+            sound,
           });
           firedRef.current.add(`api-${r.id}`);
           await api.markReminderSent(r.id).catch(() => {});

@@ -2,9 +2,10 @@
 
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Check } from 'lucide-react';
+import { Check, Repeat } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TagPill } from '@/components/tasks/TagPill';
+import { isOccurrence, isRecurring } from '@/lib/recurrence';
 
 export const PRIORITY_TINT: Record<string, string> = {
   HIGH: '#ef4444',
@@ -13,12 +14,18 @@ export const PRIORITY_TINT: Record<string, string> = {
   NONE: '#22a06b',
 };
 
-export function taskTimeLabel(task: any): string {
-  const raw = task.startDate || task.dueDate;
-  if (!raw) return '';
-  const d = new Date(raw);
+function fmtTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function taskTimeLabel(task: any): string {
+  const start = fmtTime(task.startDate);
+  const due = fmtTime(task.dueDate);
+  if (start && due && start !== due) return `${start}–${due}`;
+  return start || due;
 }
 
 export function TaskCard({
@@ -113,6 +120,11 @@ export function TaskCard({
           </span>
         ) : null}
       </span>
+      {(isOccurrence(task) || isRecurring(task)) && (
+        <span title="Повторяющаяся задача" className="shrink-0 text-primary">
+          <Repeat className="h-3.5 w-3.5" />
+        </span>
+      )}
       {taskTimeLabel(task) && (
         <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{taskTimeLabel(task)}</span>
       )}

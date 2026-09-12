@@ -12,6 +12,7 @@
     "test:agent": "tsx scripts/e2e-agent.mjs",
     "test:agent-llm": "tsx scripts/e2e-agent-llm.mjs",
     "test:agent2": "tsx scripts/e2e-agent2.mjs",
+    "test:recurrence": "tsx scripts/e2e-recurrence.mjs",
     "start": "node dist/main.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma db push",

@@ -50,6 +50,8 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[4]);
   const [remindMinutes, setRemindMinutes] = useState<number | ''>('');
   const [remindRepeat, setRemindRepeat] = useState<number | ''>('');
+  const [recurType, setRecurType] = useState('NONE');
+  const [recurEnd, setRecurEnd] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [timeConflict, setTimeConflict] = useState('');
@@ -88,6 +90,8 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
     setNewTagColor(TAG_COLORS[4]);
     setRemindMinutes('');
     setRemindRepeat('');
+    setRecurType('NONE');
+    setRecurEnd('');
     setError('');
     setTimeConflict('');
     setConflicts([]);
@@ -151,6 +155,10 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
       };
       if (startIso) data.startDate = startIso;
       if (dueIso) data.dueDate = dueIso;
+      if (recurType !== 'NONE') {
+        data.recurrenceType = recurType;
+        data.recurrenceRule = { interval: 1, end: recurEnd || null };
+      }
       if (dueIso && remindMinutes !== '') data.remindMinutes = Number(remindMinutes);
       if (dueIso && remindMinutes !== '' && remindRepeat !== '') {
         data.remindRepeatMinutes = Number(remindRepeat);
@@ -474,6 +482,33 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
           </div>
 
           
+          {/* Recurrence */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[11px] text-muted-foreground">Повтор</label>
+              <select
+                value={recurType}
+                onChange={(e) => setRecurType(e.target.value)}
+                className="mt-0.5 flex h-9 w-full rounded-md border border-input bg-card px-2 text-sm"
+              >
+                <option value="NONE">Нет</option>
+                <option value="DAILY">Ежедневно</option>
+                <option value="WEEKLY">Еженедельно</option>
+                <option value="MONTHLY">Ежемесячно</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-muted-foreground">Повторять до</label>
+              <input
+                type="date"
+                value={recurEnd}
+                disabled={recurType === 'NONE'}
+                onChange={(e) => setRecurEnd(e.target.value)}
+                className="mt-0.5 flex h-9 w-full rounded-md border border-input bg-card px-2 text-sm disabled:opacity-40"
+              />
+            </div>
+          </div>
+
           {/* Reminder + repeat */}
           <div className="grid grid-cols-2 gap-2">
             <div>

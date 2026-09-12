@@ -10,6 +10,8 @@ import { useEffectsStore } from "@/stores/effects";
 import { ThemePicker } from "@/components/ThemePicker";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { showNotification } from "@/lib/notifications";
+import { NOTIFY_SOUNDS, getNotifySound, setNotifySound, playNotifySound, type NotifySoundId } from "@/lib/notifySound";
 import {
   CheckCircle2,
   ListTodo,
@@ -41,6 +43,7 @@ export function ProfileView() {
   const [notifPerm, setNotifPerm] = useState<string>(
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"
   );
+  const [notifSound, setNotifSound] = useState<NotifySoundId>(() => getNotifySound());
 
   useEffect(() => {
     fetchTasks({ includeCompleted: "true" });
@@ -290,8 +293,55 @@ export function ProfileView() {
               </div>
               <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
                 Напоминания о задачах и днях рождения приходят через браузер, даже если вкладка
-                свернута. Проверка — каждую минуту.
+                свернута. Проверка — каждую минуту. Для работы уведомлений вкладка TaskFlow должна
+                быть открыта хотя бы в фоне.
               </p>
+              {notifPerm === "denied" && (
+                <p className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                  Браузер блокирует уведомления для сайта. Разрешите их в настройках сайта (значок
+                  замка в адресной строке), затем обновите страницу.
+                </p>
+              )}
+              <div className="mt-4 border-t border-border/50 pt-4">
+                <div className="text-sm font-semibold">Звук уведомления</div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Проигрывается вместе с напоминанием
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {NOTIFY_SOUNDS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        setNotifSound(s.id);
+                        setNotifySound(s.id);
+                        playNotifySound(s.id);
+                      }}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                        notifSound === s.id
+                          ? "border-primary bg-primary/15 text-primary"
+                          : "border-border text-muted-foreground hover:border-primary/50"
+                      )}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    showNotification("TaskFlow — проверка", {
+                      body: "Если вы видите это сообщение и слышите звук — уведомления работают.",
+                      tag: "tf-notif-test",
+                      sound: notifSound,
+                    })
+                  }
+                  className="mt-3 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/20"
+                >
+                  Проверить уведомление
+                </button>
+              </div>
             </div>
           )}
 

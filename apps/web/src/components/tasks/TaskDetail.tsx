@@ -18,6 +18,7 @@ import {
   FolderKanban,
   ListChecks,
   StickyNote,
+  Repeat,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTasksStore } from '@/stores/tasks';
@@ -29,6 +30,7 @@ import { cn, formatDate, priorityLabels } from '@/lib/utils';
 import { TAG_COLORS, TAG_ICONS, randomTagColor } from '@/lib/tags';
 import { TagIcon } from '@/components/tasks/TagIcon';
 import { useNotesStore } from '@/stores/notes';
+import { recurrenceLabel } from '@/lib/recurrence';
 
 const PRIORITIES = [
   { value: 'NONE', label: 'Нет', color: 'bg-emerald-600' },
@@ -53,6 +55,8 @@ export function TaskDetail() {
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [projectId, setProjectId] = useState('');
+  const [recurType, setRecurType] = useState('NONE');
+  const [recurEnd, setRecurEnd] = useState('');
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
@@ -95,6 +99,13 @@ export function TaskDetail() {
       setStartDate(t.startDate ? t.startDate.slice(0, 10) : '');
       setStartTime(t.startDate && !t.isAllDay ? new Date(t.startDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '');
       setProjectId(t.projectId || '');
+      setRecurType(t.recurrenceType || 'NONE');
+      try {
+        const rule = t.recurrenceRule ? JSON.parse(t.recurrenceRule) : null;
+        setRecurEnd(rule && typeof rule.end === 'string' ? rule.end.slice(0, 10) : '');
+      } catch {
+        setRecurEnd('');
+      }
       setSelectedTagIds(t.tags?.map((tt: any) => tt.tag.id) || []);
       if (t.reminders?.length && t.dueDate) {
         const rem = t.reminders[0];
@@ -187,6 +198,16 @@ const handleDueDateChange = (value: string) => {
   const handleProjectChange = (id: string) => {
     setProjectId(id);
     save({ projectId: id || null });
+  };
+
+  const saveRecurrence = (type: string, end: string) => {
+    setRecurType(type);
+    setRecurEnd(end);
+    if (type === 'NONE') {
+      save({ recurrenceType: 'NONE', recurrenceRule: null });
+    } else {
+      save({ recurrenceType: type, recurrenceRule: { interval: 1, end: end || null } });
+    }
   };
 
   const handleComplete = async () => {
@@ -543,7 +564,23 @@ const handleDueDateChange = (value: string) => {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-muted-foreground">Окончание</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] text-muted-foreground">Окончание</label>
+                    {(dueDate || dueTime) && (
+                      <button
+                        type="button"
+                        title="Убрать время окончания"
+                        onClick={() => {
+                          setDueDate('');
+                          setDueTime('');
+                          save({ dueDate: null });
+                        }}
+                        className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="date"
                     value={dueDate}
@@ -565,6 +602,42 @@ const handleDueDateChange = (value: string) => {
                       saveDates(startDate, startTime, dueDate, e.target.value);
                     }}
                     disabled={!dueDate}
+                    className="mt-0.5 w-full rounded-md border border-input bg-card px-2 py-1 text-sm disabled:opacity-40"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Recurrence */}
+            <div className="rounded-md px-2 py-2 text-sm space-y-2 border border-transparent hover:border-border">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Repeat className="h-4 w-4 shrink-0" />
+                <span>Повтор</span>
+                {recurrenceLabel(task) && (
+                  <span className="ml-auto text-[11px] text-primary">{recurrenceLabel(task)}</span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2 pl-6">
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Период</label>
+                  <select
+                    value={recurType}
+                    onChange={(e) => saveRecurrence(e.target.value, recurEnd)}
+                    className="mt-0.5 w-full rounded-md border border-input bg-card px-2 py-1 text-sm"
+                  >
+                    <option value="NONE">Нет</option>
+                    <option value="DAILY">Ежедневно</option>
+                    <option value="WEEKLY">Еженедельно</option>
+                    <option value="MONTHLY">Ежемесячно</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">До даты</label>
+                  <input
+                    type="date"
+                    value={recurEnd}
+                    disabled={recurType === 'NONE'}
+                    onChange={(e) => saveRecurrence(recurType, e.target.value)}
                     className="mt-0.5 w-full rounded-md border border-input bg-card px-2 py-1 text-sm disabled:opacity-40"
                   />
                 </div>

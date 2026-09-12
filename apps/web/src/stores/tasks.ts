@@ -26,6 +26,15 @@ interface Task {
   completedAt?: string | null;
   isDeleted?: boolean;
 
+  recurrenceType?: string | null;
+  recurrenceRule?: string | null;
+
+  // Virtual recurrence instance fields (client-side only).
+  isOccurrence?: boolean;
+  baseId?: string;
+  occurrenceDate?: string;
+  span?: boolean;
+
   _count?: { children: number };
 }
 
@@ -35,6 +44,7 @@ interface TasksState {
   tasks: Task[];
   todayTasks: Task[];
   overdueTasks: Task[];
+  recurringTasks: Task[];
 
   isLoading: boolean;
 
@@ -48,6 +58,7 @@ interface TasksState {
   fetchTasks: (params?: Record<string, string>, opts?: { silent?: boolean }) => Promise<void>;
   fetchToday: (opts?: { silent?: boolean }) => Promise<void>;
   fetchOverdue: (opts?: { silent?: boolean }) => Promise<void>;
+  fetchRecurring: (opts?: { silent?: boolean }) => Promise<void>;
 
   createTask: (data: any) => Promise<Task>;
 
@@ -56,6 +67,8 @@ interface TasksState {
   completeTask: (id: string) => Promise<void>;
 
   deleteTask: (id: string) => Promise<void>;
+
+  skipOccurrence: (baseId: string, dateKey: string) => Promise<void>;
 
   setSelectedTask: (id: string | null) => void;
 
@@ -255,6 +268,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   tasks: [],
   todayTasks: [],
   overdueTasks: [],
+  recurringTasks: [],
 
   isLoading: false,
 
@@ -317,6 +331,13 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       set({
         overdueTasks: mergeFreshInto(tasks as Task[], matchesOverdueFilter),
       });
+    } catch {}
+  }),
+
+  fetchRecurring: deduped('recurring', async () => {
+    try {
+      const { tasks } = await api.getRecurringTasks();
+      set({ recurringTasks: tasks as Task[] });
     } catch {}
   }),
 
@@ -520,6 +541,12 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   },
 
   completeTask: async (id) => {
+    // Virtual recurrence instance: completing skips just this date.
+    if (typeof id === 'string' && id.includes('@')) {
+      const [baseId, dateKey] = id.split('@');
+      await get().skipOccurrence(baseId, dateKey);
+      return;
+    }
     const current =
       get().tasks.find((item) => item.id === id) ??
       get().todayTasks.find((item) => item.id === id);
@@ -554,6 +581,12 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   },
 
   deleteTask: async (id) => {
+    // Virtual recurrence instance: deleting skips just this date.
+    if (typeof id === 'string' && id.includes('@')) {
+      const [baseId, dateKey] = id.split('@');
+      await get().skipOccurrence(baseId, dateKey);
+      return;
+    }
     const { selectedTaskId } = get();
     const snap = { tasks: get().tasks, todayTasks: get().todayTasks, overdueTasks: get().overdueTasks };
 
@@ -575,9 +608,25 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     await get().refreshCurrentView({ silent: true }).catch(() => {});
   },
 
+  skipOccurrence: async (baseId, dateKey) => {
+    set((state) => ({
+      tasks: state.tasks.filter((item) => item.id !== `${baseId}@${dateKey}`),
+      todayTasks: state.todayTasks.filter((item) => item.id !== `${baseId}@${dateKey}`),
+      overdueTasks: state.overdueTasks.filter((item) => item.id !== `${baseId}@${dateKey}`),
+    }));
+    try {
+      await api.skipOccurrence(baseId, dateKey);
+    } catch (e) {
+      throw e;
+    }
+    await get().fetchRecurring().catch(() => {});
+    await get().refreshCurrentView({ silent: true }).catch(() => {});
+  },
+
   setSelectedTask: (id) =>
     set({
-      selectedTaskId: id,
+      // Occurrence ids open their base task detail.
+      selectedTaskId: id && id.includes('@') ? id.split('@')[0] : id,
     }),
 
   setCurrentView: (view) => {

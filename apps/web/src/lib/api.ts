@@ -139,6 +139,17 @@ class ApiClient {
     return this.request<{ tasks: any[] }>('/tasks/overdue');
   }
 
+  getRecurringTasks() {
+    return this.request<{ tasks: any[] }>('/tasks/recurring');
+  }
+
+  skipOccurrence(baseId: string, date: string) {
+    return this.request<{ success: boolean }>(`/tasks/${baseId}/skip-occurrence`, {
+      method: 'POST',
+      body: JSON.stringify({ date }),
+    });
+  }
+
   getTask(id: string) {
     return this.request<{ task: any }>(`/tasks/${id}`);
   }

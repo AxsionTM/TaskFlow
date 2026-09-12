@@ -18,7 +18,17 @@ const createTaskSchema = z.object({
   isAllDay: z.boolean().optional(),
   status: z.enum(['TODO', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
   recurrenceType: z.enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'CUSTOM']).optional(),
-  recurrenceRule: z.string().optional().nullable(),
+  recurrenceRule: z
+    .union([
+      z.string().max(2000),
+      z.object({
+        interval: z.number().int().optional(),
+        end: z.string().max(32).optional().nullable(),
+        skip: z.array(z.string().max(16)).max(500).optional(),
+      }),
+    ])
+    .optional()
+    .nullable(),
   remindMinutes: z.number().int().optional().nullable(),
   remindRepeatMinutes: z.number().int().min(1).max(60).optional().nullable(),
   noteContent: z
@@ -45,6 +55,39 @@ const checklistItemSchema = z.object({
   title: z.string().min(1),
   isCompleted: z.boolean().optional(),
 });
+
+// recurrenceRule: object form is normalized to a JSON string; end date validated.
+function normalizeRecurrenceRule(rule: unknown): string | null | undefined {
+  if (rule === undefined) return undefined;
+  if (rule === null) return null;
+  if (typeof rule === 'string') {
+    const trimmed = rule.trim();
+    if (!trimmed) return null;
+    try {
+      const parsed = JSON.parse(trimmed);
+      return normalizeRecurrenceRule(parsed) ?? trimmed;
+    } catch {
+      return trimmed.slice(0, 2000);
+    }
+  }
+  if (typeof rule === 'object') {
+    const r = rule as { interval?: unknown; end?: unknown; skip?: unknown };
+    const out: { interval?: number; end?: string; skip?: string[] } = {};
+    if (typeof r.interval === 'number' && Number.isFinite(r.interval)) {
+      out.interval = Math.min(30, Math.max(1, Math.floor(r.interval)));
+    }
+    if (typeof r.end === 'string' && r.end) {
+      const d = new Date(r.end);
+      if (Number.isNaN(d.getTime())) throw new AppError(400, 'Некорректная дата окончания повтора');
+      out.end = d.toISOString().slice(0, 10);
+    }
+    if (Array.isArray(r.skip)) {
+      out.skip = r.skip.filter((s) => typeof s === 'string').slice(0, 500);
+    }
+    return JSON.stringify(out);
+  }
+  return null;
+}
 
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
@@ -220,6 +263,7 @@ router.get('/today', async (req: AuthRequest, res, next) => {
           where: { isDeleted: false },
           orderBy: { sortOrder: 'asc' },
         },
+        reminders: true,
         project: { select: { id: true, name: true, color: true } },
         _count: { select: { children: true } },
       },
@@ -249,6 +293,7 @@ router.get('/overdue', async (req: AuthRequest, res, next) => {
       include: {
         tags: { include: { tag: true } },
         checklist: true,
+        reminders: true,
         project: { select: { id: true, name: true, color: true } },
         _count: { select: { children: true } },
       },
@@ -256,6 +301,60 @@ router.get('/overdue', async (req: AuthRequest, res, next) => {
     });
 
     res.json({ tasks });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Lightweight bases for client-side recurrence expansion (before /:id).
+router.get('/recurring', async (req: AuthRequest, res, next) => {
+  try {
+    const tasks = await prisma.task.findMany({
+      where: {
+        creatorId: req.userId,
+        isDeleted: false,
+        isArchived: false,
+        parentId: null,
+        status: { not: 'COMPLETED' },
+        recurrenceType: { not: 'NONE' },
+      },
+      include: {
+        tags: { include: { tag: true } },
+        reminders: true,
+        project: { select: { id: true, name: true, color: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    res.json({ tasks });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Skip a single recurrence instance (complete/delete of an occurrence).
+router.post('/:id/skip-occurrence', async (req: AuthRequest, res, next) => {
+  try {
+    const { date } = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(req.body);
+    const existing = await prisma.task.findFirst({
+      where: { id: req.params.id, creatorId: req.userId, isDeleted: false },
+    });
+    if (!existing || existing.recurrenceType === 'NONE') {
+      throw new AppError(404, 'Повторяющаяся задача не найдена');
+    }
+    let rule: { interval?: number; end?: string; skip?: string[] } = {};
+    try {
+      rule = existing.recurrenceRule ? JSON.parse(existing.recurrenceRule) : {};
+    } catch {
+      rule = {};
+    }
+    const skip = Array.isArray(rule.skip) ? rule.skip : [];
+    if (!skip.includes(date)) skip.push(date);
+    await prisma.task.update({
+      where: { id: existing.id },
+      data: { recurrenceRule: JSON.stringify({ ...rule, skip: skip.slice(-500) }) },
+    });
+    res.json({ success: true });
   } catch (err) {
     next(err);
   }
@@ -487,7 +586,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
           isAllDay: isSubtaskCreate ? true : (data.isAllDay ?? true),
           status: data.status || 'TODO',
           recurrenceType: isSubtaskCreate ? 'NONE' : (data.recurrenceType || 'NONE'),
-          recurrenceRule: isSubtaskCreate ? null : data.recurrenceRule,
+          recurrenceRule: isSubtaskCreate ? null : normalizeRecurrenceRule(data.recurrenceRule) ?? null,
           creatorId: req.userId!,
           tags: data.tagIds
             ? { create: data.tagIds.map((tagId) => ({ tagId })) }
@@ -557,6 +656,12 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
     }
 
     const updateData: any = { ...data };
+    if (data.recurrenceRule !== undefined) {
+      updateData.recurrenceRule = normalizeRecurrenceRule(data.recurrenceRule);
+    }
+    if (data.recurrenceType === 'NONE') {
+      updateData.recurrenceRule = null;
+    }
     const resultingParentId = data.parentId !== undefined ? data.parentId : existing.parentId;
     if (resultingParentId) {
       // Subtasks are intentionally lightweight: title + completion only.
