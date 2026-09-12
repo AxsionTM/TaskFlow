@@ -172,6 +172,24 @@ class ApiClient {
     });
   }
 
+  getVapidKey() {
+    return this.request<{ key: string | null; pushReady: boolean }>('/push/vapid-key');
+  }
+
+  subscribePush(data: { endpoint: string; p256dh: string; auth: string; userAgent?: string }) {
+    return this.request<{ subscription: { id: string } }>('/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  unsubscribePush(endpoint: string) {
+    return this.request<{ success: boolean }>('/push/unsubscribe', {
+      method: 'POST',
+      body: JSON.stringify({ endpoint }),
+    });
+  }
+
   createTask(data: any) {
     return this.request<{ task: any }>('/tasks', { method: 'POST', body: JSON.stringify(data) });
   }

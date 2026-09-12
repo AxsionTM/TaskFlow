@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import { checkLocalReminders, showNotification } from '@/lib/notifications';
 import { getNotifySound } from '@/lib/notifySound';
+import { isPushActive } from '@/lib/push';
 import { expandRecurrence } from '@/lib/recurrence';
 import { useTasksStore } from '@/stores/tasks';
 import { useBirthdaysStore, isSameMonthDay, ageFromDate } from '@/stores/birthdays';
@@ -57,6 +58,13 @@ export function ReminderWorker() {
 
       checkLocalReminders(unique, firedRef.current, (id) => firedRef.current.add(id), sound);
 
+      // When Web Push is active on this device, explicit reminders and
+      // birthdays are delivered by the server (works with closed tab).
+      // The client skips those loops to avoid double notifications;
+      // local due-time defaults above stay as a fallback.
+      const pushActive = await isPushActive().catch(() => false);
+
+      if (!pushActive) {
       const birthdays = useBirthdaysStore.getState().items;
       const user = useAuthStore.getState().user;
       const now = new Date();
@@ -124,6 +132,7 @@ export function ReminderWorker() {
       } catch {
         // offline / unauthorized — ignore
       }
+      } // end if (!pushActive)
     };
 
     tick();

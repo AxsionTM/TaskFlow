@@ -1,4 +1,4 @@
-const CACHE = 'taskflow-v3';
+const CACHE = 'taskflow-v4';
 const ASSETS = ['/', '/login', '/register', '/app'];
 
 self.addEventListener('install', (event) => {
@@ -81,6 +81,47 @@ self.addEventListener('fetch', (event) => {
         return response;
       }).catch(() => cached);
       return cached || fetched;
+    })
+  );
+});
+
+// Web Push (works with the tab closed, on desktop and mobile).
+// Payload from the server: { title, body, tag, url, type }.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+  const title = data.title || 'TaskFlow';
+  const options = {
+    body: data.body || '',
+    icon: '/logo-tf.png',
+    badge: '/favicon.png',
+    tag: data.tag || 'taskflow-push',
+    renotify: true,
+    requireInteraction: data.type === 'reminder',
+    data: { url: data.url || '/app' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/app';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ('focus' in client) {
+          try {
+            client.navigate(url);
+          } catch {}
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+      return undefined;
     })
   );
 });

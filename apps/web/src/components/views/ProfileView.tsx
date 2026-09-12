@@ -11,6 +11,7 @@ import { ThemePicker } from "@/components/ThemePicker";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { showNotification, reminderFireTimes } from "@/lib/notifications";
+import { isPushSupported, isPushActive, subscribePush, unsubscribePush } from "@/lib/push";
 import { NOTIFY_SOUNDS, getNotifySound, setNotifySound, playNotifySound, type NotifySoundId } from "@/lib/notifySound";
 import {
   CheckCircle2,
@@ -45,10 +46,48 @@ export function ProfileView() {
   );
   const [notifSound, setNotifSound] = useState<NotifySoundId>(() => getNotifySound());
   const [diagNow, setDiagNow] = useState(() => Date.now());
+  const [pushStatus, setPushStatus] = useState<'checking' | 'unsupported' | 'off' | 'on'>('checking');
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState('');
+
+  const refreshPushStatus = async () => {
+    try {
+      if (!isPushSupported()) {
+        setPushStatus('unsupported');
+        return;
+      }
+      setPushStatus((await isPushActive()) ? 'on' : 'off');
+    } catch {
+      setPushStatus('off');
+    }
+  };
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    setPushError('');
+    try {
+      if (pushStatus === 'on') {
+        await unsubscribePush();
+      } else {
+        await subscribePush();
+        try {
+          if (typeof window !== 'undefined' && 'Notification' in window) {
+            setNotifPerm(Notification.permission);
+          }
+        } catch {}
+      }
+      await refreshPushStatus();
+    } catch (e: any) {
+      setPushError(e?.message || 'Не удалось подключить push');
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   // Live diagnostics for the notification pipeline (worker heartbeat + next fire).
   useEffect(() => {
     if (tab !== 'notifications') return;
+    refreshPushStatus().catch(() => {});
     const refresh = () => {
       setDiagNow(Date.now());
       try {
@@ -411,6 +450,45 @@ export function ProfileView() {
                 >
                   Проверить уведомление
                 </button>
+              </div>
+              <div className="mt-4 border-t border-border/50 pt-4">
+                <div className="text-sm font-semibold">Push на телефон</div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Приходят даже с закрытой вкладкой — через сервер TaskFlow
+                </p>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Статус:{" "}
+                  {pushStatus === 'checking' ? (
+                    'проверка…'
+                  ) : pushStatus === 'on' ? (
+                    <span className="font-semibold text-emerald-500">подключён ✓</span>
+                  ) : pushStatus === 'unsupported' ? (
+                    <span className="text-amber-400">не поддерживается этим браузером</span>
+                  ) : (
+                    'выключен'
+                  )}
+                </div>
+                {pushStatus === 'unsupported' && (
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    iPhone: push работает только если сайт добавлен на экран «Домой» (Поделиться →
+                    «На экран Домой») и открыт оттуда. Android Chrome: работает прямо в браузере.
+                  </p>
+                )}
+                {pushError && (
+                  <p className="mt-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                    {pushError}
+                  </p>
+                )}
+                {pushStatus !== 'unsupported' && pushStatus !== 'checking' && (
+                  <button
+                    type="button"
+                    disabled={pushBusy}
+                    onClick={togglePush}
+                    className="mt-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+                  >
+                    {pushBusy ? 'Подождите…' : pushStatus === 'on' ? 'Отключить push' : 'Подключить push'}
+                  </button>
+                )}
               </div>
             </div>
           )}

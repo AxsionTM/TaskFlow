@@ -20,6 +20,7 @@ import { birthdaysRouter } from "./modules/birthdays/birthdays.routes";
 import { graphRouter } from "./modules/graph.routes";
 import { notesRouter } from "./modules/notes/notes.routes";
 import { notificationsRouter } from "./modules/notifications/notifications.routes";
+import { pushRouter, cronRouter } from "./modules/push/push.routes";
 import { agentRouter } from "./modules/agent/agent.routes";
 import { adminRouter } from "./modules/admin/admin.routes";
 import { errorHandler } from "./common/middleware/error-handler";
@@ -157,6 +158,10 @@ app.use("/birthdays", authMiddleware, maintenanceGate, writeLimiter, birthdaysRo
 app.use("/graph", authMiddleware, maintenanceGate, graphRouter);
 app.use("/notes", authMiddleware, maintenanceGate, writeLimiter, notesRouter);
 app.use("/notifications", authMiddleware, maintenanceGate, notificationsRouter);
+app.use("/push", authMiddleware, maintenanceGate, writeLimiter, pushRouter);
+// Server push dispatch for closed-tab/mobile delivery. Secret-gated (CRON_SECRET),
+// no user auth — triggered by Vercel Cron or an external per-minute cron.
+app.use("/cron", cronRouter);
 app.use("/admin", adminLimiter, adminRouter);
 
 app.use(errorHandler);
@@ -220,6 +225,14 @@ if (!process.env.VERCEL) {
   httpServer.listen(PORT, () => {
     console.log(`API server running on port ${PORT}`);
   });
+  // Long-lived hosts only (local/dev): per-minute server push dispatch.
+  // On Vercel (serverless) this never persists — use Vercel Cron instead.
+  const everyMin = 60_000;
+  setInterval(() => {
+    import('./modules/push/dispatch')
+      .then((m) => m.dispatchDuePush().catch((e) => console.error('push dispatch failed', e)))
+      .catch((e) => console.error('push dispatch failed', e));
+  }, everyMin);
 }
 
 export { app, io };
