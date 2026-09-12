@@ -938,6 +938,8 @@ const handleDueDateChange = (value: string) => {
                     mins,
                     mins === null || remindRepeat === '' ? null : Number(remindRepeat)
                   );
+                  await loadTask();
+                  await useTasksStore.getState().refreshCurrentView({ silent: true }).catch(() => {});
                 } catch (err: any) {
                   alert(err.message || 'Не удалось сохранить напоминание');
                 }
@@ -968,6 +970,8 @@ const handleDueDateChange = (value: string) => {
                       remindMinutes,
                       rep === '' ? null : Number(rep)
                     );
+                    await loadTask();
+                    await useTasksStore.getState().refreshCurrentView({ silent: true }).catch(() => {});
                   } catch (err: any) {
                     alert(err.message || 'Не удалось сохранить повтор');
                   }

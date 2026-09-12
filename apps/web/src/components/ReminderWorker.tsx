@@ -23,6 +23,10 @@ export function ReminderWorker() {
     if (typeof window === 'undefined') return;
 
     const tick = async () => {
+      // Heartbeat for diagnostics (Profile shows worker liveness).
+      try {
+        localStorage.setItem('tf-notif-worker-tick', String(Date.now()));
+      } catch {}
       if (api.isMaintenanceKnown()) return;
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
@@ -69,24 +73,30 @@ export function ReminderWorker() {
           now.getMonth() === remindAt.getMonth() &&
           now.getDate() === remindAt.getDate()
         ) {
-          showNotification(`День рождения: ${b.name}`, {
-            body: `${ageFromDate(b.date)} лет · ${b.note || 'Не забудьте поздравить!'}`,
-            tag: key,
-            sound,
-          });
-          firedRef.current.add(key);
+          if (
+            showNotification(`День рождения: ${b.name}`, {
+              body: `${ageFromDate(b.date)} лет · ${b.note || 'Не забудьте поздравить!'}`,
+              tag: key,
+              sound,
+            })
+          ) {
+            firedRef.current.add(key);
+          }
         }
       }
 
       if (user?.birthday && isSameMonthDay(String(user.birthday), now)) {
         const key = `bday-me-${now.toISOString().slice(0, 10)}`;
         if (!firedRef.current.has(key)) {
-          showNotification('С днём рождения!', {
-            body: 'Пусть день будет продуктивным и приятным!',
-            tag: key,
-            sound,
-          });
-          firedRef.current.add(key);
+          if (
+            showNotification('С днём рождения!', {
+              body: 'Пусть день будет продуктивным и приятным!',
+              tag: key,
+              sound,
+            })
+          ) {
+            firedRef.current.add(key);
+          }
         }
       }
 
@@ -96,15 +106,20 @@ export function ReminderWorker() {
           if (firedRef.current.has(`api-${r.id}`)) continue;
           const at = new Date(r.remindAt).getTime();
           if (Date.now() + 120_000 < at) continue;
-          showNotification(r.task?.title || 'Напоминание TaskFlow', {
-            body: r.task?.dueDate
-              ? `Срок: ${new Date(r.task.dueDate).toLocaleString('ru-RU')}`
-              : 'Пора выполнить задачу',
-            tag: `reminder-${r.id}`,
-            sound,
-          });
-          firedRef.current.add(`api-${r.id}`);
-          await api.markReminderSent(r.id).catch(() => {});
+          // Past-due unsent reminders intentionally fire here too (catch-up
+          // after sleep/throttled timers). Mark sent only when shown.
+          if (
+            showNotification(r.task?.title || 'Напоминание TaskFlow', {
+              body: r.task?.dueDate
+                ? `Срок: ${new Date(r.task.dueDate).toLocaleString('ru-RU')}`
+                : 'Пора выполнить задачу',
+              tag: `reminder-${r.id}`,
+              sound,
+            })
+          ) {
+            firedRef.current.add(`api-${r.id}`);
+            await api.markReminderSent(r.id).catch(() => {});
+          }
         }
       } catch {
         // offline / unauthorized — ignore
@@ -113,7 +128,18 @@ export function ReminderWorker() {
 
     tick();
     const id = setInterval(tick, 60_000);
-    return () => clearInterval(id);
+    // Fire immediately when the user returns to the tab instead of waiting
+    // for the next minute tick (missed fire times are caught up above).
+    const onReturn = () => {
+      if (!document.hidden) void tick();
+    };
+    document.addEventListener('visibilitychange', onReturn);
+    window.addEventListener('focus', onReturn);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onReturn);
+      window.removeEventListener('focus', onReturn);
+    };
   }, []);
 
   return null;

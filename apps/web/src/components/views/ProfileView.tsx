@@ -10,7 +10,7 @@ import { useEffectsStore } from "@/stores/effects";
 import { ThemePicker } from "@/components/ThemePicker";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { showNotification } from "@/lib/notifications";
+import { showNotification, reminderFireTimes } from "@/lib/notifications";
 import { NOTIFY_SOUNDS, getNotifySound, setNotifySound, playNotifySound, type NotifySoundId } from "@/lib/notifySound";
 import {
   CheckCircle2,
@@ -44,6 +44,45 @@ export function ProfileView() {
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"
   );
   const [notifSound, setNotifSound] = useState<NotifySoundId>(() => getNotifySound());
+  const [diagNow, setDiagNow] = useState(() => Date.now());
+
+  // Live diagnostics for the notification pipeline (worker heartbeat + next fire).
+  useEffect(() => {
+    if (tab !== 'notifications') return;
+    const refresh = () => {
+      setDiagNow(Date.now());
+      try {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+          setNotifPerm(Notification.permission);
+        }
+      } catch {}
+    };
+    refresh();
+    const id = setInterval(refresh, 5000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [tab]);
+
+  const notifDiag = useMemo(() => {
+    let lastTick: number | null = null;
+    try {
+      const raw = localStorage.getItem('tf-notif-worker-tick');
+      if (raw) lastTick = Number(raw) || null;
+    } catch {}
+    let next: number | null = null;
+    try {
+      for (const t of tasks || []) {
+        for (const at of reminderFireTimes(t)) {
+          if (at > Date.now() && (next === null || at < next)) next = at;
+        }
+      }
+    } catch {}
+    return { lastTick, next };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, diagNow]);
 
   useEffect(() => {
     fetchTasks({ includeCompleted: "true" });
@@ -302,6 +341,37 @@ export function ProfileView() {
                   замка в адресной строке), затем обновите страницу.
                 </p>
               )}
+              <div className="mt-3 rounded-xl border border-border/60 bg-card/40 px-3 py-2.5 text-xs">
+                <div className="font-semibold">Диагностика</div>
+                <div className="mt-1.5 space-y-1 text-muted-foreground">
+                  <div>
+                    Проверяющий воркер:{" "}
+                    {notifDiag.lastTick ? (
+                      <span className="text-foreground">
+                        жив · {Math.max(0, Math.round((diagNow - notifDiag.lastTick) / 1000))} сек назад
+                      </span>
+                    ) : (
+                      <span className="text-amber-400">ещё не запускался — откройте раздел «Задачи»</span>
+                    )}
+                  </div>
+                  <div>
+                    Ближайшее напоминание:{" "}
+                    {notifDiag.next ? (
+                      <span className="text-foreground">
+                        {new Date(notifDiag.next).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    ) : (
+                      <span>нет запланированных среди загруженных задач</span>
+                    )}
+                  </div>
+                  {!('Notification' in (typeof window !== 'undefined' ? window : ({} as any))) && (
+                    <div className="text-amber-400">
+                      Этот браузер не поддерживает всплывающие уведомления (например, Chrome на
+                      телефоне) — напоминания будут видны только внутри приложения.
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="mt-4 border-t border-border/50 pt-4">
                 <div className="text-sm font-semibold">Звук уведомления</div>
                 <p className="mt-0.5 text-xs text-muted-foreground">

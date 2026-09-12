@@ -10,12 +10,13 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
 import { playNotifySound, type NotifySoundId } from './notifySound';
 
+/** Returns true only when the notification was actually shown. */
 export function showNotification(
   title: string,
   options?: NotificationOptions & { sound?: NotifySoundId }
-) {
-  if (typeof window === 'undefined' || !('Notification' in window)) return;
-  if (Notification.permission !== 'granted') return;
+): boolean {
+  if (typeof window === 'undefined' || !('Notification' in window)) return false;
+  if (Notification.permission !== 'granted') return false;
   const { sound, ...rest } = options || {};
   try {
     new Notification(title, {
@@ -23,8 +24,10 @@ export function showNotification(
       ...rest,
     });
     playNotifySound(sound);
+    return true;
   } catch {
-    // ignore
+    // e.g. mobile browsers without `new Notification()` support
+    return false;
   }
 }
 
@@ -92,18 +95,23 @@ export function checkLocalReminders(
     for (const at of reminderFireTimes(t)) {
       const key = `${t.id}-${at}`;
       if (fired.has(key)) continue;
-      // within last 60s window so polling every 30s catches it
-      if (now >= at && now < at + 120_000) {
+      // 5-minute window: background tabs throttle timers to ~1/min,
+      // so a 60s poll can otherwise miss the fire time entirely.
+      if (now >= at && now < at + 300_000) {
         const mins = Number.isNaN(due) ? null : Math.round((due - at) / 60000);
         const when =
           mins === null || mins <= 0 ? 'Сейчас срок' : `Через ${mins} мин срок`;
-        showNotification(t.title, {
-          body: when,
-          tag: key,
-          requireInteraction: mins === 0,
-          sound,
-        });
-        markFired(key);
+        // Mark fired only when actually shown — otherwise retry next tick.
+        if (
+          showNotification(t.title, {
+            body: when,
+            tag: key,
+            requireInteraction: mins === 0,
+            sound,
+          })
+        ) {
+          markFired(key);
+        }
       }
     }
   }
