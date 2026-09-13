@@ -107,9 +107,10 @@ export function TaskDetail() {
         setRecurEnd('');
       }
       setSelectedTagIds(t.tags?.map((tt: any) => tt.tag.id) || []);
-      if (t.reminders?.length && t.dueDate) {
+      const anchorIso = t.startDate ?? t.dueDate;
+      if (t.reminders?.length && anchorIso) {
         const rem = t.reminders[0];
-        const diff = Math.round((new Date(t.dueDate).getTime() - new Date(rem.remindAt).getTime()) / 60000);
+        const diff = Math.round((new Date(anchorIso).getTime() - new Date(rem.remindAt).getTime()) / 60000);
         setRemindMinutes(diff >= 0 ? diff : 0);
       } else {
         setRemindMinutes(null);
@@ -924,14 +925,14 @@ const handleDueDateChange = (value: string) => {
             <select
               className="w-full h-9 rounded-md border border-input bg-card px-2 text-sm disabled:opacity-40"
               value={remindMinutes === null ? '' : String(remindMinutes)}
-              disabled={!dueDate}
+              disabled={!(dueDate || startDate)}
               onChange={async (e) => {
                 const v = e.target.value;
                 const mins = v === '' ? null : Number(v);
                 setRemindMinutes(mins);
                 if (mins === null) setRemindRepeat('');
                 if (!selectedTaskId) return;
-                if (!dueDate) return;
+                if (!dueDate && !startDate) return;
                 try {
                   await api.setTaskReminder(
                     selectedTaskId,
@@ -945,25 +946,24 @@ const handleDueDateChange = (value: string) => {
                 }
               }}
             >
-              <option value="">Нет</option>
-              <option value="0">В момент срока</option>
-              <option value="5">За 5 минут</option>
-              <option value="15">За 15 минут</option>
-              <option value="30">За 30 минут</option>
-              <option value="60">За 1 час</option>
-              <option value="1440">За 1 день</option>
-            </select>
+                <option value="">Нет</option>
+                <option value="0">В момент начала</option>
+                <option value="5">За 5 минут до начала</option>
+                <option value="15">За 15 минут до начала</option>
+                <option value="30">За 30 минут до начала</option>
+                <option value="60">За 1 час до начала</option>
+                <option value="1440">За 1 день до начала</option>
+              </select>
             <div className="mt-2 flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Повтор каждых</span>
-              <select
-                className="h-9 flex-1 rounded-md border border-input bg-card px-2 text-sm disabled:opacity-40"
-                value={remindRepeat === '' ? '' : String(remindRepeat)}
-                disabled={!dueDate || remindMinutes === null}
-                title="Будет напоминать повторно с этим интервалом вплоть до срока"
-                onChange={async (e) => {
-                  const rep = e.target.value === '' ? '' : Number(e.target.value);
-                  setRemindRepeat(rep as number | '');
-                  if (!selectedTaskId || !dueDate || remindMinutes === null) return;
+                <span className="text-xs text-muted-foreground">Повтор каждых</span>
+                <select
+                  value={remindRepeat === '' ? '' : String(remindRepeat)}
+                  disabled={!(dueDate || startDate) || remindMinutes === null}
+                  title="Будет напоминать повторно с этим интервалом вплоть до начала"
+                  onChange={async (e) => {
+                    const rep = e.target.value === '' ? '' : Number(e.target.value);
+                    setRemindRepeat(rep as number | '');
+                    if (!selectedTaskId || (!dueDate && !startDate) || remindMinutes === null) return;
                   try {
                     await api.setTaskReminder(
                       selectedTaskId,
@@ -985,12 +985,12 @@ const handleDueDateChange = (value: string) => {
                 <option value="30">30 мин</option>
               </select>
             </div>
-            {!dueDate && (
+            {!(dueDate || startDate) && (
               <p className="text-[11px] text-muted-foreground mt-1">
-                Сначала укажите дату окончания (срок).
+                Сначала укажите дату начала или срок.
               </p>
             )}
-            {dueDate && (
+            {(dueDate || startDate) && (
               <p className="text-[11px] text-muted-foreground mt-1">
                 Нужно разрешение уведомлений в браузере. Проверка каждые 30 сек.
               </p>

@@ -549,13 +549,16 @@ router.get('/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
-function buildReminderTimes(due: Date, remindMinutes: number, repeatMinutes?: number | null): Date[] {
-  const first = new Date(due.getTime() - remindMinutes * 60 * 1000);
+// Reminder anchor = task START (fall back to dueDate): «за 5 минут» means
+// 5 minutes before the task begins. `anchor` is the moment, `repeatMinutes`
+// repeats from the first fire up to (and including) the anchor.
+function buildReminderTimes(anchor: Date, remindMinutes: number, repeatMinutes?: number | null): Date[] {
+  const first = new Date(anchor.getTime() - remindMinutes * 60 * 1000);
   const times: Date[] = [first];
   if (repeatMinutes && repeatMinutes > 0) {
     let next = new Date(first.getTime() + repeatMinutes * 60 * 1000);
     let guard = 0;
-    while (next.getTime() <= due.getTime() && guard < 11) {
+    while (next.getTime() <= anchor.getTime() && guard < 11) {
       times.push(new Date(next));
       next = new Date(next.getTime() + repeatMinutes * 60 * 1000);
       guard++;
@@ -621,10 +624,11 @@ router.post('/', async (req: AuthRequest, res, next) => {
       return created;
     });
 
-    // Browser/server reminders relative to dueDate (with optional repeat series)
-    if (data.dueDate && data.remindMinutes != null && data.remindMinutes >= 0) {
-      const due = new Date(data.dueDate);
-      const times = buildReminderTimes(due, data.remindMinutes, data.remindRepeatMinutes);
+    // Reminders anchored to task start (fall back to dueDate), with optional repeat series
+    const remindAnchorRaw = data.startDate ?? data.dueDate;
+    if (remindAnchorRaw && data.remindMinutes != null && data.remindMinutes >= 0) {
+      const anchor = new Date(remindAnchorRaw);
+      const times = buildReminderTimes(anchor, data.remindMinutes, data.remindRepeatMinutes);
       for (const remindAt of times) {
         await prisma.reminder.create({
           data: { taskId: task.id, remindAt },
@@ -741,7 +745,7 @@ router.put('/:id/reminder', async (req: AuthRequest, res, next) => {
       where: { id: req.params.id, creatorId: req.userId, isDeleted: false },
     });
     if (!task) throw new AppError(404, 'Задача не найдена');
-    if (!task.dueDate) throw new AppError(400, 'Сначала укажите срок задачи');
+    if (!task.startDate && !task.dueDate) throw new AppError(400, 'Сначала укажите дату начала или срок задачи');
 
     const minutes = z.number().int().min(0).nullable().optional().parse(req.body.remindMinutes);
     const repeat = z.number().int().min(1).max(60).nullable().optional().parse(req.body.repeatMinutes);
@@ -752,7 +756,7 @@ router.put('/:id/reminder', async (req: AuthRequest, res, next) => {
       return res.json({ success: true, reminder: null });
     }
 
-    const times = buildReminderTimes(task.dueDate, minutes, repeat);
+    const times = buildReminderTimes(new Date((task.startDate ?? task.dueDate) as Date), minutes, repeat);
     let reminder = null;
     for (const remindAt of times) {
       reminder = await prisma.reminder.create({

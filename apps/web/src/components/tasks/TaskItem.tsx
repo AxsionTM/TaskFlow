@@ -3,7 +3,7 @@
 import { occurrenceBaseId } from '@/lib/recurrence';
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
-import { cn, formatDate } from '@/lib/utils';
+import { cn, formatDate, isTaskOverdue } from '@/lib/utils';
 import { TagPill } from '@/components/tasks/TagPill';
 import { Calendar, Flag } from 'lucide-react';
 
@@ -33,10 +33,9 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
     due!.getTime() < now.getTime() &&
     due!.getTime() >= todayStart.getTime() &&
     task.status !== 'COMPLETED';
-  const isOverdue =
-    Boolean(due) &&
-    due!.getTime() < todayStart.getTime() &&
-    task.status !== 'COMPLETED';
+  // Red overdue: timed task whose end passed (even intraday);
+  // all-day tasks only after the day ends (see isTaskOverdue).
+  const isOverdue = isTaskOverdue(task, now.getTime());
   const contextualDateLabel =
     currentView === 'today' && (task.startDate || task.dueDate)
       ? 'Сегодня'
@@ -55,7 +54,8 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
         onClick={() => setSelectedTask(task.id)}
         className={cn(
           'group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors',
-          isSelected ? 'tf-task-active' : 'hover:bg-accent/60'
+          isSelected ? 'tf-task-active' : 'hover:bg-accent/60',
+          isOverdue && 'ring-1 ring-red-500/60 bg-red-500/[0.05]'
         )}
         style={{ paddingLeft: `${12 + depth * 16}px` }}
       >
@@ -84,7 +84,8 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
             <p
               className={cn(
                 'text-sm truncate',
-                task.status === 'COMPLETED' && 'line-through text-muted-foreground'
+                task.status === 'COMPLETED' && 'line-through text-muted-foreground',
+                isOverdue && 'text-red-500 font-semibold'
               )}
             >
               {task.title}
@@ -104,6 +105,11 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
                   : isTimeLateToday
                   ? `${contextualDateLabel} · время прошло`
                   : `${contextualDateLabel}${timeLabel ? ` · ${timeLabel}` : ''}`}
+              </span>
+            )}
+            {isOverdue && (
+              <span className="inline-flex items-center rounded-full border border-red-500/60 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-500">
+                Просрочено
               </span>
             )}
             {task.tags?.map((tt: any) => (

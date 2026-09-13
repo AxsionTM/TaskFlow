@@ -3,7 +3,7 @@
 import { useTasksStore } from '@/stores/tasks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Check, Repeat } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, isTaskOverdue } from '@/lib/utils';
 import { TagPill } from '@/components/tasks/TagPill';
 import { isOccurrence, isRecurring } from '@/lib/recurrence';
 
@@ -51,13 +51,15 @@ export function TaskCard({
   const tagName = allTags.length ? '' : task.project?.name || '';
   const letter = (task.title || '?').trim().slice(0, 1).toUpperCase();
   const checked = task.status === 'COMPLETED';
+  const overdue = !checked && isTaskOverdue(task);
 
   return (
     <div
       onClick={() => setSelectedTask(task.id)}
       className={cn(
         'px-3.5 py-3 flex items-center gap-3 cursor-pointer transition-transform hover:scale-[1.005]',
-        flat ? 'rounded-none' : 'tf-glass rounded-2xl'
+        flat ? 'rounded-none' : 'tf-glass rounded-2xl',
+        overdue && 'ring-1 ring-red-500/60'
       )}
     >
       {ringColor ? (
@@ -103,7 +105,8 @@ export function TaskCard({
         <span
           className={cn(
             'block truncate text-[15px] font-medium',
-            checked && 'line-through text-muted-foreground'
+            checked && 'line-through text-muted-foreground',
+            overdue && 'text-red-500 font-semibold'
           )}
         >
           {task.title}
@@ -119,6 +122,11 @@ export function TaskCard({
             <TagPill tag={{ name: tagName, color: task.project?.color }} />
           </span>
         ) : null}
+        {overdue && (
+          <span className="mt-1.5 inline-flex items-center rounded-full border border-red-500/60 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-500">
+            Просрочено
+          </span>
+        )}
       </span>
       {(isOccurrence(task) || isRecurring(task)) && (
         <span title="Повторяющаяся задача" className="shrink-0 text-primary">
@@ -126,7 +134,9 @@ export function TaskCard({
         </span>
       )}
       {taskTimeLabel(task) && (
-        <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{taskTimeLabel(task)}</span>
+        <span className={cn('shrink-0 text-sm tabular-nums text-muted-foreground', overdue && 'text-red-500 font-semibold')}>
+          {taskTimeLabel(task)}
+        </span>
       )}
     </div>
   );

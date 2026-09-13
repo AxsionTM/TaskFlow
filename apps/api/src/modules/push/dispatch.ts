@@ -71,7 +71,7 @@ export async function dispatchDuePush(now = new Date()) {
   const due = await prisma.reminder.findMany({
     where: { isSent: false, remindAt: { lte: new Date(now.getTime() + 30_000) } },
     include: {
-      task: { select: { id: true, title: true, dueDate: true, status: true, isDeleted: true, creatorId: true } },
+      task: { select: { id: true, title: true, dueDate: true, startDate: true, status: true, isDeleted: true, creatorId: true } },
     },
     orderBy: { remindAt: 'asc' },
     take: 50,
@@ -84,9 +84,10 @@ export async function dispatchDuePush(now = new Date()) {
         continue;
       }
       const subs = await prisma.pushSubscription.findMany({ where: { userId: t.creatorId } });
+      const begin = (t as any).startDate ?? t.dueDate;
       const payload: PushPayload = {
         title: t.title,
-        body: t.dueDate ? `Срок: ${new Date(t.dueDate).toLocaleString('ru-RU')}` : 'Пора выполнить задачу',
+        body: begin ? `Начало: ${new Date(begin).toLocaleString('ru-RU')}` : 'Пора выполнить задачу',
         tag: `reminder-${r.id}`,
         url: '/app',
         type: 'reminder',

@@ -159,8 +159,8 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
         data.recurrenceType = recurType;
         data.recurrenceRule = { interval: 1, end: recurEnd || null };
       }
-      if (dueIso && remindMinutes !== '') data.remindMinutes = Number(remindMinutes);
-      if (dueIso && remindMinutes !== '' && remindRepeat !== '') {
+      if ((dueIso || startIso) && remindMinutes !== '') data.remindMinutes = Number(remindMinutes);
+      if ((dueIso || startIso) && remindMinutes !== '' && remindRepeat !== '') {
         data.remindRepeatMinutes = Number(remindRepeat);
       }
 
@@ -523,12 +523,12 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
                 className="mt-0.5 flex h-9 w-full rounded-md border border-input bg-card px-2 text-sm disabled:opacity-40"
               >
                 <option value="">Нет</option>
-                <option value="0">В момент срока</option>
-                <option value="5">За 5 минут</option>
-                <option value="15">За 15 минут</option>
-                <option value="30">За 30 минут</option>
-                <option value="60">За 1 час</option>
-                <option value="1440">За 1 день</option>
+                <option value="0">В момент начала</option>
+                <option value="5">За 5 минут до начала</option>
+                <option value="15">За 15 минут до начала</option>
+                <option value="30">За 30 минут до начала</option>
+                <option value="60">За 1 час до начала</option>
+                <option value="1440">За 1 день до начала</option>
               </select>
             </div>
             <div>
@@ -539,7 +539,7 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
                   setRemindRepeat(e.target.value === '' ? '' : Number(e.target.value))
                 }
                 disabled={remindMinutes === ''}
-                title="Будет напоминать повторно с этим интервалом вплоть до срока"
+                title="Будет напоминать повторно с этим интервалом вплоть до начала"
                 className="mt-0.5 flex h-9 w-full rounded-md border border-input bg-card px-2 text-sm disabled:opacity-40"
               >
                 <option value="">Не повторять</option>
