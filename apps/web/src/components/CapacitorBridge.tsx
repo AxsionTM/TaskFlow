@@ -91,13 +91,37 @@ export function CapacitorBridge() {
 
       await resync(true);
       const id = setInterval(() => void resync(false), 15 * 60 * 1000);
-      const onResume = () => void resync(false);
+      // Returning to the app: make sure just-made changes are scheduled.
+      // Cheap when nothing changed (signature check inside skips rescheduling).
+      const onResume = () => void resync(true);
       document.addEventListener('visibilitychange', onResume);
       window.addEventListener('focus', onResume);
+      // Reactive resync: ANY task/birthday mutation (create, edit time,
+      // reminder, repeat, delete) reschedules within seconds — even if the
+      // user closes the app right after. This is the main path that makes
+      // reminders appear; the 15-minute timer is only a safety net.
+      let debounceId: ReturnType<typeof setTimeout> | null = null;
+      const scheduleResync = () => {
+        if (cancelled) return;
+        if (debounceId) clearTimeout(debounceId);
+        debounceId = setTimeout(() => {
+          debounceId = null;
+          void resync(true);
+        }, 4000);
+      };
+      const unsubTasks = useTasksStore.subscribe(() => scheduleResync());
+      const unsubBdays = useBirthdaysStore.subscribe(() => scheduleResync());
       cleanup = (() => {
         const prev = cleanup;
         return () => {
           clearInterval(id);
+          if (debounceId) clearTimeout(debounceId);
+          try {
+            unsubTasks();
+          } catch {}
+          try {
+            unsubBdays();
+          } catch {}
           document.removeEventListener('visibilitychange', onResume);
           window.removeEventListener('focus', onResume);
           if (prev) prev();
