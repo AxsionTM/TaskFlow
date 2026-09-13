@@ -525,60 +525,16 @@ export async function initCapacitorBridge(opts: BridgeOpts): Promise<() => void>
 
 export async function registerFcmToken(): Promise<boolean> {
   if (!isNativeApp()) return false;
-  try {
-    const { PushNotifications } = await import('@capacitor/push-notifications');
-    const perm = await PushNotifications.checkPermissions().catch(() => null);
-    if (perm?.receive !== 'granted') {
-      const req = await PushNotifications.requestPermissions();
-      if (req.receive !== 'granted') return false;
-    }
-    await PushNotifications.register();
-    const done = await new Promise<boolean>((resolve) => {
-      let finished = false;
-      const timer = setTimeout(() => {
-        if (!finished) {
-          finished = true;
-          resolve(false);
-        }
-      }, 8000);
-      PushNotifications.addListener('registration', async (token: any) => {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timer);
-        try {
-          const { api } = await import('./api');
-          if (!api.getToken()) {
-            writeDiag({ fcm: 'no-login' });
-            resolve(false);
-            return;
-          }
-          await api.registerFcmToken(String(token.value), 'android');
-          writeDiag({ fcm: 'registered' });
-          resolve(true);
-        } catch {
-          writeDiag({ fcm: 'backend-error' });
-          resolve(false);
-        }
-      }).catch(() => {
-        if (!finished) {
-          finished = true;
-          clearTimeout(timer);
-          resolve(false);
-        }
-      });
-      PushNotifications.addListener('registrationError', () => {
-        if (!finished) {
-          finished = true;
-          clearTimeout(timer);
-          writeDiag({ fcm: 'unavailable' });
-          resolve(false);
-        }
-      }).catch(() => {});
-    });
-    return done;
-  } catch {
-    // No google-services.json / no Play services → local notifications only.
-    writeDiag({ fcm: 'unavailable' });
-    return false;
-  }
+  // Firebase is NOT configured in this build: no google-services.json and no
+  // server credentials. Calling PushNotifications.register() would throw
+  // IllegalStateException natively ("Default FirebaseApp is not initialized")
+  // on the bridge thread, killing the whole app process — and that cannot be
+  // caught from JS. So registration is intentionally skipped; local
+  // notifications are the delivery mechanism. (checkPermissions /
+  // requestPermissions / addListener never touch Firebase and stay safe.)
+  // Re-enable the block below only together with google-services.json +
+  // FIREBASE_SERVICE_ACCOUNT_JSON on the backend.
+  writeDiag({ fcm: 'unavailable' });
+  logN('fcm skipped', { reason: 'firebase-not-configured' });
+  return false;
 }
