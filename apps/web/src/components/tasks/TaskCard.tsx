@@ -58,8 +58,7 @@ export function TaskCard({
       onClick={() => setSelectedTask(task.id)}
       className={cn(
         'px-3.5 py-3 flex items-center gap-3 cursor-pointer transition-transform hover:scale-[1.005]',
-        flat ? 'rounded-none' : 'tf-glass rounded-2xl',
-        overdue && 'ring-1 ring-red-500/60'
+        flat ? 'rounded-none' : 'tf-glass rounded-2xl'
       )}
     >
       {ringColor ? (

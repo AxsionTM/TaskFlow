@@ -56,9 +56,10 @@ export function notifyDueTasks(overdue: any[], today: any[]) {
 
 /**
  * Resolve fire times for a task: explicit server reminders + sensible
- * defaults. BOTH ends are anchors: startDate fires «Задача началась»,
- * dueDate fires the deadline. Times are absolute UTC millis — no timezone
- * shift (server stores ISO, alarms fire at the instant).
+ * defaults. Only the START notifies: if startDate exists, the end (dueDate)
+ * never fires (no «конец задачи» notifications). Tasks with only dueDate
+ * notify at it (it's their only moment). Times are absolute UTC millis —
+ * no timezone shift (server stores ISO, alarms fire at the instant).
  */
 export function reminderFireTimes(t: any): number[] {
   if (!t || t.status === 'COMPLETED') return [];
@@ -72,15 +73,13 @@ export function reminderFireTimes(t: any): number[] {
       push(new Date(r.remindAt).getTime());
     }
   }
-  const anchors: number[] = [];
-  for (const raw of [t.dueDate, t.startDate]) {
-    const at = raw ? new Date(raw).getTime() : NaN;
-    if (!Number.isNaN(at) && !anchors.includes(at)) anchors.push(at);
-  }
-  for (const a of anchors) {
+  const startRaw = t.startDate || null;
+  const anchorRaw = startRaw || t.dueDate;
+  const anchor = anchorRaw ? new Date(anchorRaw).getTime() : NaN;
+  if (!Number.isNaN(anchor)) {
     // Defaults so tasks without explicit settings still notify.
-    push(a);
-    push(a - 15 * 60 * 1000);
+    push(anchor);
+    push(anchor - 15 * 60 * 1000);
   }
   return times.sort((a, b) => a - b);
 }

@@ -54,8 +54,7 @@ export function TaskItem({ task, depth = 0 }: { task: any; depth?: number }) {
         onClick={() => setSelectedTask(task.id)}
         className={cn(
           'group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors',
-          isSelected ? 'tf-task-active' : 'hover:bg-accent/60',
-          isOverdue && 'ring-1 ring-red-500/60 bg-red-500/[0.05]'
+          isSelected ? 'tf-task-active' : 'hover:bg-accent/60'
         )}
         style={{ paddingLeft: `${12 + depth * 16}px` }}
       >
