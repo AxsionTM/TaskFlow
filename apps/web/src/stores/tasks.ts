@@ -254,8 +254,12 @@ function mergeFreshInto(list: Task[], gate?: (task: Task) => boolean): Task[] {
     if (gate && !gate(pending)) continue;
     const index = result.findIndex((item) => item.id === id);
     if (index >= 0) {
+      // Merge, don't replace: mutation responses (POST/PATCH) don't include
+      // server-managed relations like `reminders` — replacing with them would
+      // wipe data the server just returned, breaking both the reminder UI
+      // and native notification scheduling.
       const next = [...result];
-      next[index] = pending;
+      next[index] = { ...result[index], ...pending } as Task;
       result = next;
     } else {
       result = [pending, ...result];

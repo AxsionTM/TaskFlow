@@ -107,13 +107,36 @@ export function TaskDetail() {
         setRecurEnd('');
       }
       setSelectedTagIds(t.tags?.map((tt: any) => tt.tag.id) || []);
-      const anchorIso = t.startDate ?? t.dueDate;
-      if (t.reminders?.length && anchorIso) {
-        const rem = t.reminders[0];
-        const diff = Math.round((new Date(anchorIso).getTime() - new Date(rem.remindAt).getTime()) / 60000);
-        setRemindMinutes(diff >= 0 ? diff : 0);
+      // Restore reminder UI from server rows (robust to row order and to
+      // rows created before the start-anchor change): minutes = smallest
+      // non-negative (anchor − earliest row); repeat = uniform step, if any.
+      const anchors = [t.startDate, t.dueDate]
+        .map((d: any) => (d ? new Date(d).getTime() : NaN))
+        .filter((x: number) => !Number.isNaN(x));
+      const rows = Array.isArray(t.reminders)
+        ? t.reminders
+            .map((r: any) => new Date(r.remindAt).getTime())
+            .filter((x: number) => !Number.isNaN(x))
+            .sort((a: number, b: number) => a - b)
+        : [];
+      if (rows.length && anchors.length) {
+        const earliest = rows[0];
+        const cands = anchors
+          .map((a) => Math.round((a - earliest) / 60000))
+          .filter((d) => d >= 0);
+        setRemindMinutes(cands.length ? Math.min(...cands) : 0);
+        if (rows.length > 1) {
+          const step = Math.round((rows[1] - rows[0]) / 60000);
+          const uniform =
+            step > 0 &&
+            rows.every((x: number, i: number) => i === 0 || Math.round((x - rows[i - 1]) / 60000) === step);
+          setRemindRepeat(uniform ? step : '');
+        } else {
+          setRemindRepeat('');
+        }
       } else {
         setRemindMinutes(null);
+        setRemindRepeat('');
       }
     } catch {
       setSelectedTask(null);
