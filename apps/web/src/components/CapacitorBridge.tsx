@@ -107,7 +107,7 @@ export function CapacitorBridge() {
         debounceId = setTimeout(() => {
           debounceId = null;
           void resync(true);
-        }, 4000);
+        }, 2500);
       };
       const unsubTasks = useTasksStore.subscribe(() => scheduleResync());
       const unsubBdays = useBirthdaysStore.subscribe(() => scheduleResync());

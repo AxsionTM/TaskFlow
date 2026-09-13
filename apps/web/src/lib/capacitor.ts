@@ -294,18 +294,24 @@ export async function syncNativeReminders(input: SyncInput): Promise<number> {
 
     for (const t of input.tasks || []) {
       if (!t || t.status === 'COMPLETED') continue;
-      const anchorRaw = t.dueDate || t.startDate;
-      const anchor = anchorRaw ? new Date(anchorRaw).getTime() : NaN;
+      const dueMs = t.dueDate ? new Date(t.dueDate).getTime() : NaN;
+      const startMs = t.startDate ? new Date(t.startDate).getTime() : NaN;
+      const anchorMs = !Number.isNaN(dueMs) ? dueMs : startMs;
       const baseId = typeof t.baseId === 'string' ? t.baseId : String(t.id).split('@')[0];
       for (const at of reminderFireTimes(t)) {
         if (at <= now || at > horizon) continue;
-        const mins = Number.isNaN(anchor) ? null : Math.round((anchor - at) / 60000);
         const taskTitle = String(t.title || 'TaskFlow');
-        const isStart = mins === null || mins <= 0;
+        const isStartExact =
+          !Number.isNaN(startMs) &&
+          Math.abs(at - startMs) < 60000 &&
+          (Number.isNaN(dueMs) || Math.abs(dueMs - startMs) >= 60000);
+        const isDueExact = !Number.isNaN(dueMs) && Math.abs(at - dueMs) < 60000;
+        const mins = Number.isNaN(anchorMs) ? null : Math.round((anchorMs - at) / 60000);
+        const isMoment = isStartExact || isDueExact || mins === null || (mins !== null && mins <= 0);
         list.push({
           id: stableId(`task|${baseId}|${at}`),
-          title: isStart ? 'Задача началась' : taskTitle,
-          body: isStart ? taskTitle : `Начнётся через ${mins} мин`,
+          title: isMoment ? 'Задача началась' : taskTitle,
+          body: isMoment ? taskTitle : `Начнётся через ${mins} мин`,
           at,
           channel: 'tf-reminders',
           extra: { kind: 'task', taskId: baseId },

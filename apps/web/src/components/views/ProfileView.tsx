@@ -582,6 +582,10 @@ export function ProfileView() {
                       {nativeDiag.error && !nativeDiag.testAt ? (
                         <div className="text-amber-400">Ошибка: {nativeDiag.error}</div>
                       ) : null}
+                      <div>
+                        Если проверка работает, а задачи нет: Настройки Android → Приложения →
+                        TaskFlow → Будильники и напоминания → Разрешить.
+                      </div>
                     </div>
                   </div>
                 )}

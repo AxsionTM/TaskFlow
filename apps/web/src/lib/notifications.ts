@@ -54,25 +54,33 @@ export function notifyDueTasks(overdue: any[], today: any[]) {
   sessionStorage.setItem(key, '1');
 }
 
-/** Resolve fire times for a task: explicit server reminders + sensible defaults. */
+/**
+ * Resolve fire times for a task: explicit server reminders + sensible
+ * defaults. BOTH ends are anchors: startDate fires «Задача началась»,
+ * dueDate fires the deadline. Times are absolute UTC millis — no timezone
+ * shift (server stores ISO, alarms fire at the instant).
+ */
 export function reminderFireTimes(t: any): number[] {
   if (!t || t.status === 'COMPLETED') return [];
   const times: number[] = [];
-  // Tasks may have only startDate (end time removed) — notify on it as well.
-  const anchorRaw = t.dueDate || t.startDate;
-  const due = anchorRaw ? new Date(anchorRaw).getTime() : NaN;
+  const push = (at: number) => {
+    if (!Number.isNaN(at) && !times.includes(at)) times.push(at);
+  };
   if (Array.isArray(t.reminders)) {
     for (const r of t.reminders) {
       if (r?.isSent) continue;
-      const at = new Date(r.remindAt).getTime();
-      if (!Number.isNaN(at) && !times.includes(at)) times.push(at);
+      push(new Date(r.remindAt).getTime());
     }
   }
-  if (!Number.isNaN(due)) {
+  const anchors: number[] = [];
+  for (const raw of [t.dueDate, t.startDate]) {
+    const at = raw ? new Date(raw).getTime() : NaN;
+    if (!Number.isNaN(at) && !anchors.includes(at)) anchors.push(at);
+  }
+  for (const a of anchors) {
     // Defaults so tasks without explicit settings still notify.
-    if (!times.includes(due)) times.push(due);
-    const early = due - 15 * 60 * 1000;
-    if (!times.includes(early)) times.push(early);
+    push(a);
+    push(a - 15 * 60 * 1000);
   }
   return times.sort((a, b) => a - b);
 }
