@@ -159,8 +159,10 @@ app.use("/graph", authMiddleware, maintenanceGate, graphRouter);
 app.use("/notes", authMiddleware, maintenanceGate, writeLimiter, notesRouter);
 app.use("/notifications", authMiddleware, maintenanceGate, notificationsRouter);
 app.use("/push", authMiddleware, maintenanceGate, writeLimiter, pushRouter);
-// Server push dispatch for closed-tab/mobile delivery. Secret-gated (CRON_SECRET),
-// no user auth — triggered by Vercel Cron or an external per-minute cron.
+// Server push dispatch for the WEB version (browser Web Push).
+// Secret-gated (CRON_SECRET), no user auth — triggered manually or by an
+// external scheduler. NOT by Vercel Cron (removed for the Hobby plan).
+// The Android APK schedules its own local notifications and never calls this.
 app.use("/cron", cronRouter);
 app.use("/admin", adminLimiter, adminRouter);
 

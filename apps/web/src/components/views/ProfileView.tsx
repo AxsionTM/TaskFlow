@@ -10,9 +10,18 @@ import { useEffectsStore } from "@/stores/effects";
 import { ThemePicker } from "@/components/ThemePicker";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { showNotification, reminderFireTimes } from "@/lib/notifications";
+import { reminderFireTimes } from "@/lib/notifications";
 import { isPushSupported, isPushActive, subscribePush, unsubscribePush } from "@/lib/push";
 import { NOTIFY_SOUNDS, getNotifySound, setNotifySound, playNotifySound, type NotifySoundId } from "@/lib/notifySound";
+import { useBirthdaysStore } from "@/stores/birthdays";
+import {
+  isNativeApp,
+  requestNativeNotifPermission,
+  sendTestNotification,
+  getNativeDiag,
+  syncNativeReminders,
+  type NativeDiag,
+} from "@/lib/capacitor";
 import {
   CheckCircle2,
   ListTodo,
@@ -49,6 +58,17 @@ export function ProfileView() {
   const [pushStatus, setPushStatus] = useState<'checking' | 'unsupported' | 'off' | 'on'>('checking');
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState('');
+  const [isNative] = useState(() => {
+    try {
+      return isNativeApp();
+    } catch {
+      return false;
+    }
+  });
+  const [nativePerm, setNativePerm] = useState('unknown');
+  const [nativeDiag, setNativeDiag] = useState<NativeDiag | null>(null);
+  const [testMsg, setTestMsg] = useState('');
+  const [testBusy, setTestBusy] = useState(false);
 
   const refreshPushStatus = async () => {
     try {
@@ -93,6 +113,11 @@ export function ProfileView() {
       try {
         if (typeof window !== 'undefined' && 'Notification' in window) {
           setNotifPerm(Notification.permission);
+        }
+      } catch {}
+      try {
+        if (isNativeApp()) {
+          setNativeDiag(getNativeDiag());
         }
       } catch {}
     };
@@ -168,8 +193,54 @@ export function ProfileView() {
 
   const requestNotif = async () => {
     try {
+      if (isNativeApp()) {
+        const ok = await requestNativeNotifPermission();
+        setNativePerm(ok ? 'granted' : 'denied');
+        try {
+          setNativeDiag(getNativeDiag());
+        } catch {}
+        return;
+      }
       const res = await Notification.requestPermission();
       setNotifPerm(res);
+    } catch {}
+  };
+
+  const handleTestNotif = async () => {
+    setTestBusy(true);
+    setTestMsg('');
+    try {
+      const r = await sendTestNotification();
+      if (r.ok) {
+        setTestMsg(r.system === 'native' ? 'Системное уведомление отправлено ✓' : 'Уведомление показано в браузере ✓');
+      } else {
+        setTestMsg(r.error || 'Не удалось показать уведомление');
+      }
+    } catch (e: any) {
+      setTestMsg(e?.message || 'Ошибка уведомления');
+    } finally {
+      setTestBusy(false);
+      try {
+        if (isNativeApp()) setNativeDiag(getNativeDiag());
+      } catch {}
+    }
+  };
+
+  // After a sound change, recreate Android channels + reschedule right away
+  // (no waiting for the 15-minute background resync).
+  const resyncNativeAfterSound = async () => {
+    try {
+      if (!isNativeApp()) return;
+      const s = useTasksStore.getState();
+      const b = useBirthdaysStore.getState();
+      const u = useAuthStore.getState().user;
+      const all = [...(s.tasks || []), ...(s.todayTasks || []), ...(s.recurringTasks || [])];
+      await syncNativeReminders({
+        tasks: all,
+        birthdays: (b as any).items || [],
+        userBirthday: (u as any)?.birthday ?? null,
+      });
+      setNativeDiag(getNativeDiag());
     } catch {}
   };
 
@@ -347,10 +418,16 @@ export function ProfileView() {
                   <BellOff className="h-5 w-5 text-muted-foreground" />
                 )}
                 <div>
-                  <div className="text-sm font-semibold">Уведомления браузера</div>
+                  <div className="text-sm font-semibold">{isNative ? "Уведомления Android" : "Уведомления браузера"}</div>
                   <div className="text-xs text-muted-foreground">
                     Статус:{" "}
-                    {notifPerm === "granted"
+                    {isNative
+                      ? nativePerm === "granted"
+                        ? "включены"
+                        : nativePerm === "denied"
+                        ? "заблокированы — разрешите в настройках Android"
+                        : "не запрошены"
+                      : notifPerm === "granted"
                       ? "включены"
                       : notifPerm === "denied"
                       ? "заблокированы в браузере"
@@ -359,7 +436,7 @@ export function ProfileView() {
                       : "не запрошены"}
                   </div>
                 </div>
-                {notifPerm !== "granted" && notifPerm !== "unsupported" && (
+                {(isNative ? nativePerm !== "granted" : notifPerm !== "granted" && notifPerm !== "unsupported") && (
                   <button
                     type="button"
                     onClick={requestNotif}
@@ -425,6 +502,7 @@ export function ProfileView() {
                         setNotifSound(s.id);
                         setNotifySound(s.id);
                         playNotifySound(s.id);
+                        void resyncNativeAfterSound();
                       }}
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
@@ -439,17 +517,74 @@ export function ProfileView() {
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
-                    showNotification("TaskFlow — проверка", {
-                      body: "Если вы видите это сообщение и слышите звук — уведомления работают.",
-                      tag: "tf-notif-test",
-                      sound: notifSound,
-                    })
-                  }
-                  className="mt-3 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/20"
+                  disabled={testBusy}
+                  onClick={() => void handleTestNotif()}
+                  className="mt-3 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
                 >
-                  Проверить уведомление
+                  {testBusy ? "Отправка…" : "Проверить уведомление"}
                 </button>
+                {testMsg && (
+                  <p className="mt-2 text-xs text-muted-foreground">{testMsg}</p>
+                )}
+                {isNative && nativeDiag && (
+                  <div className="mt-3 rounded-xl border border-border/60 bg-card/40 px-3 py-2.5 text-xs">
+                    <div className="font-semibold">Android-диагностика</div>
+                    <div className="mt-1.5 space-y-1 text-muted-foreground">
+                      <div>
+                        Разрешение:{" "}
+                        <span className="text-foreground">
+                          {nativeDiag.perm === "granted"
+                            ? "разрешено ✓"
+                            : nativeDiag.perm === "denied"
+                            ? "запрещено — включите в настройках Android"
+                            : "не запрошено"}
+                        </span>
+                      </div>
+                      <div>
+                        Канал:{" "}
+                        <span className="text-foreground">
+                          tf-reminders · звук «{nativeDiag.channelSound || getNotifySound()}»
+                        </span>
+                      </div>
+                      <div>
+                        Часовой пояс:{" "}
+                        <span className="text-foreground">{nativeDiag.timezone || "—"}</span>
+                      </div>
+                      <div>
+                        Запланировано напоминаний:{" "}
+                        <span className="text-foreground">{nativeDiag.scheduled}</span>
+                        {nativeDiag.lastSyncAt ? (
+                          <span>
+                            {" "}· синхр. {new Date(nativeDiag.lastSyncAt).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        ) : (
+                          <span> · ещё не синхронизировались</span>
+                        )}
+                      </div>
+                      <div>
+                        FCM:{" "}
+                        <span className="text-foreground">
+                          {nativeDiag.fcm === "registered"
+                            ? "токен отправлен на сервер ✓"
+                            : nativeDiag.fcm === "no-login"
+                            ? "войдите в аккаунт для регистрации"
+                            : "недоступен — используются локальные уведомления"}
+                        </span>
+                      </div>
+                      {nativeDiag.testAt ? (
+                        <div>
+                          Проверка:{" "}
+                          <span className="text-foreground">
+                            {nativeDiag.testOk ? "успешно ✓" : `не удалась${nativeDiag.error ? ` (${nativeDiag.error})` : ""}`}
+                          </span>
+                        </div>
+                      ) : null}
+                      {nativeDiag.error && !nativeDiag.testAt ? (
+                        <div className="text-amber-400">Ошибка: {nativeDiag.error}</div>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="mt-4 border-t border-border/50 pt-4">
                 <div className="text-sm font-semibold">Push на телефон</div>

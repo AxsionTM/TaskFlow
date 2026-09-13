@@ -49,9 +49,39 @@ router.post('/unsubscribe', async (req: AuthRequest, res, next) => {
   }
 });
 
-// Server-side dispatch: called by Vercel Cron (or external cron) every minute.
-// Auth: CRON_SECRET via `Authorization: Bearer <secret>` (Vercel adds it
-// automatically when CRON_SECRET is set) or `?key=<secret>` for external crons.
+// Native Android (Capacitor) FCM token registration.
+router.post('/fcm', async (req: AuthRequest, res, next) => {
+  try {
+    const data = z
+      .object({ token: z.string().min(1).max(4096), platform: z.string().max(32).optional() })
+      .parse(req.body);
+    await prisma.fcmToken.upsert({
+      where: { token: data.token },
+      update: { userId: req.userId!, platform: data.platform || 'android' },
+      create: { userId: req.userId!, token: data.token, platform: data.platform || 'android' },
+    });
+    res.status(201).json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/fcm', async (req: AuthRequest, res, next) => {
+  try {
+    const { token } = z.object({ token: z.string().min(1).max(4096) }).parse(req.body);
+    await prisma.fcmToken.deleteMany({ where: { token, userId: req.userId } });
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Server-side dispatch for the WEB version (browser Web Push).
+// Triggered manually or by an external scheduler — NOT by Vercel Cron
+// (removed: Hobby plan allows cron only once per day).
+// The Android APK does NOT depend on this endpoint: it schedules local
+// notifications itself via Capacitor Local Notifications / AlarmManager.
+// Auth: CRON_SECRET via `Authorization: Bearer <secret>` or `?key=<secret>`.
 // Mounted WITHOUT user auth in main.ts.
 export const cronRouter = Router();
 

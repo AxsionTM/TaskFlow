@@ -80,6 +80,7 @@ model User {
   focusSessions FocusSession[]
   notifications Notification[]
   pushSubscriptions PushSubscription[]
+  fcmTokens FcmToken[]
   subscriptions Subscription[]
   transactions  Transaction[]
   notes         Note[]
@@ -656,4 +657,19 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+// Native Android (Capacitor) FCM tokens. Server push to the installed app.
+model FcmToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   @default("android")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("fcm_tokens")
 }

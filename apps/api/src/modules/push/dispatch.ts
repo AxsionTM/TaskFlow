@@ -7,6 +7,7 @@ export interface PushPayload {
   tag?: string;
   url?: string;
   type?: string;
+  taskId?: string;
 }
 
 function vapid() {
@@ -83,17 +84,23 @@ export async function dispatchDuePush(now = new Date()) {
         continue;
       }
       const subs = await prisma.pushSubscription.findMany({ where: { userId: t.creatorId } });
-      if (subs.length > 0) {
-        const payload: PushPayload = {
-          title: t.title,
-          body: t.dueDate ? `Срок: ${new Date(t.dueDate).toLocaleString('ru-RU')}` : 'Пора выполнить задачу',
-          tag: `reminder-${r.id}`,
-          url: '/app',
-          type: 'reminder',
-        };
-        for (const s of subs) {
-          if (await sendPush(s, payload)) result.pushes++;
-        }
+      const payload: PushPayload = {
+        title: t.title,
+        body: t.dueDate ? `Срок: ${new Date(t.dueDate).toLocaleString('ru-RU')}` : 'Пора выполнить задачу',
+        tag: `reminder-${r.id}`,
+        url: '/app',
+        type: 'reminder',
+        taskId: t.id,
+      };
+      for (const s of subs) {
+        if (await sendPush(s, payload)) result.pushes++;
+      }
+      // Native Android app via FCM (no-op without Firebase credentials).
+      try {
+        const { sendFcm } = await import('./fcm');
+        result.pushes += await sendFcm(t.creatorId, payload);
+      } catch {
+        result.errors++;
       }
       await prisma.reminder.update({ where: { id: r.id }, data: { isSent: true } });
       result.reminders++;
@@ -139,10 +146,23 @@ export async function dispatchDuePush(now = new Date()) {
       });
       sentKeys.add(key);
       const subs = await prisma.pushSubscription.findMany({ where: { userId: b.userId } });
+      const bdayPayload: PushPayload = {
+        title: `День рождения: ${b.name}`,
+        body,
+        tag: `bday-${b.id}`,
+        url: '/app',
+        type: 'birthday',
+      };
       for (const s of subs) {
-        if (await sendPush(s, { title: `День рождения: ${b.name}`, body, tag: `bday-${b.id}`, url: '/app', type: 'birthday' })) {
+        if (await sendPush(s, bdayPayload)) {
           result.pushes++;
         }
+      }
+      try {
+        const { sendFcm } = await import('./fcm');
+        result.pushes += await sendFcm(b.userId, bdayPayload);
+      } catch {
+        result.errors++;
       }
       result.birthdays++;
     } catch {

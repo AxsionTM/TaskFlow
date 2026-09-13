@@ -190,6 +190,13 @@ class ApiClient {
     });
   }
 
+  registerFcmToken(token: string, platform?: string) {
+    return this.request<{ success: boolean }>('/push/fcm', {
+      method: 'POST',
+      body: JSON.stringify({ token, platform: platform || 'android' }),
+    });
+  }
+
   createTask(data: any) {
     return this.request<{ task: any }>('/tasks', { method: 'POST', body: JSON.stringify(data) });
   }

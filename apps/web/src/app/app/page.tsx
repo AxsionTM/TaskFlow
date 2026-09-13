@@ -13,6 +13,7 @@ import { EffectsLayer } from '@/components/EffectsLayer';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { GlobalQuickAdd } from '@/components/GlobalQuickAdd';
 import { ReminderWorker } from '@/components/ReminderWorker';
+import { CapacitorBridge } from '@/components/CapacitorBridge';
 import { MobileNav } from '@/components/mobile/MobileNav';
 import { MobileMoreMenu } from '@/components/mobile/MobileMoreMenu';
 import { NotificationCenter } from '@/components/NotificationCenter';
@@ -194,6 +195,7 @@ export default function AppPage() {
       <OnboardingTour />
       <GlobalQuickAdd />
       <ReminderWorker />
+      <CapacitorBridge />
       <MobileNav onMore={() => setMoreOpen(true)} />
       <MobileMoreMenu open={moreOpen} onClose={() => setMoreOpen(false)} />
     </div>
