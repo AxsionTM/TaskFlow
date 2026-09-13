@@ -73,8 +73,25 @@ export function reminderFireTimes(t: any): number[] {
       push(new Date(r.remindAt).getTime());
     }
   }
-  const startRaw = t.startDate || null;
-  const anchorRaw = startRaw || t.dueDate;
+  const startMs = t.startDate ? new Date(t.startDate).getTime() : NaN;
+  const dueMs = t.dueDate ? new Date(t.dueDate).getTime() : NaN;
+  // Legacy rows were computed from the END before the start-anchor change.
+  // Any explicit row inside (start, due] on a ranged task is such a legacy
+  // row — end notifications are removed, so skip it. Valid start-anchored
+  // rows are always <= start and are kept.
+  const hasRange =
+    !Number.isNaN(startMs) && !Number.isNaN(dueMs) && Math.abs(dueMs - startMs) >= 60000;
+  if (Array.isArray(t.reminders) && hasRange) {
+    // Rebuild without legacy rows (mutating a copy, not the task object).
+    const kept: number[] = [];
+    for (const at of times) {
+      if (at > startMs && at <= dueMs) continue;
+      kept.push(at);
+    }
+    times.length = 0;
+    times.push(...kept);
+  }
+  const anchorRaw = t.startDate || t.dueDate;
   const anchor = anchorRaw ? new Date(anchorRaw).getTime() : NaN;
   if (!Number.isNaN(anchor)) {
     // Defaults so tasks without explicit settings still notify.
