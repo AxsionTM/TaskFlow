@@ -70,9 +70,16 @@ function stepDate(d: Date, type: string, interval: number): Date {
 
 /**
  * Expand a recurring base task into virtual occurrences between date keys.
- * Times of day are preserved; skipped instances are excluded.
+ * Times of day are preserved; every occurrence carries ITS OWN date
+ * (never the base creation date).
+ *
+ * A skipped instance (checked off / deleted for that date) is excluded by
+ * default. With includeSkipped=true it is returned with status COMPLETED so
+ * day views can render it as done (checked, not a ghost) — unchecking it
+ * unskips the date. Skipped instances never produce reminder fires
+ * (reminderFireTimes ignores COMPLETED).
  */
-export function expandRecurrence(task: any, fromKey: string, to: string, cap = 60): any[] {
+export function expandRecurrence(task: any, fromKey: string, to: string, cap = 60, includeSkipped = false): any[] {
   if (!isRecurring(task) || task.status === 'COMPLETED') return [];
   const rule = parseRecurrenceRule(task);
   const skip = new Set(rule.skip || []);
@@ -94,13 +101,21 @@ export function expandRecurrence(task: any, fromKey: string, to: string, cap = 6
     const key = toKey(current);
     if (key > to) break;
     if (rule.end && key > rule.end) break;
-    if (key >= fromKey && key >= anchorKey && !skip.has(key)) {
+    if (key >= fromKey && key >= anchorKey && (includeSkipped || !skip.has(key))) {
+      const done = skip.has(key);
       out.push({
         ...task,
         id: `${task.id}@${key}`,
         baseId: task.id,
         isOccurrence: true,
         occurrenceDate: key,
+        ...(done
+          ? {
+              status: 'COMPLETED',
+              completedAt: new Date(`${key}T12:00:00`).toISOString(),
+              skippedDone: true,
+            }
+          : {}),
         startDate: task.startDate ? atTime(key, startT) : null,
         dueDate: task.dueDate ? atTime(key, dueT) : task.startDate ? atTime(key, startT) : null,
       });
@@ -150,11 +165,17 @@ export function taskSpanKeys(task: any): string[] {
  * Recurring bases are replaced by their occurrences inside the range
  * (an occurrence IS the task on that day).
  */
-export function mergeWithOccurrences(baseList: any[], recurring: any[], fromKey: string, toKey: string): any[] {
+export function mergeWithOccurrences(
+  baseList: any[],
+  recurring: any[],
+  fromKey: string,
+  toKey: string,
+  includeSkipped = true
+): any[] {
   const list = Array.isArray(baseList) ? baseList : [];
   const rec = Array.isArray(recurring) ? recurring.filter((t) => isRecurring(t)) : [];
   if (!rec.length) return list;
-  const occurrences = rec.flatMap((t) => expandRecurrence(t, fromKey, toKey));
+  const occurrences = rec.flatMap((t) => expandRecurrence(t, fromKey, toKey, 60, includeSkipped));
   // Every recurring base is represented ONLY by its occurrences — the base
   // row itself (with the stale creation dates) must never render in day
   // views. Hiding by ALL base ids (not only those with occurrences in range)

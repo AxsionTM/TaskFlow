@@ -150,6 +150,13 @@ class ApiClient {
     });
   }
 
+  unskipOccurrence(baseId: string, date: string) {
+    return this.request<{ success: boolean }>(`/tasks/${baseId}/unskip-occurrence`, {
+      method: 'DELETE',
+      body: JSON.stringify({ date }),
+    });
+  }
+
   getTask(id: string) {
     return this.request<{ task: any }>(`/tasks/${id}`);
   }

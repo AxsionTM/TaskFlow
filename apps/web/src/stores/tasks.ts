@@ -73,6 +73,11 @@ interface TasksState {
 
   skipOccurrence: (baseId: string, dateKey: string) => Promise<void>;
 
+  unskipOccurrence: (baseId: string, dateKey: string) => Promise<void>;
+
+  /** Check/uncheck a single recurrence date: toggles its skipped state. */
+  toggleOccurrence: (baseId: string, dateKey: string) => Promise<void>;
+
   setSelectedTask: (id: string | null) => void;
 
   setCurrentView: (view: string) => void;
@@ -552,11 +557,30 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     await get().refreshCurrentView({ silent: true }).catch(() => {});
   },
 
+  toggleOccurrence: async (baseId, dateKey) => {
+    let skipped = false;
+    try {
+      const base =
+        get().recurringTasks.find((item) => item.id === baseId) ??
+        get().tasks.find((item) => item.id === baseId) ??
+        get().todayTasks.find((item) => item.id === baseId);
+      const { parseRecurrenceRule } = await import('@/lib/recurrence');
+      const rule = parseRecurrenceRule(base);
+      skipped = Array.isArray(rule.skip) && rule.skip.includes(dateKey);
+    } catch {}
+    if (skipped) {
+      await get().unskipOccurrence(baseId, dateKey);
+    } else {
+      await get().skipOccurrence(baseId, dateKey);
+    }
+  },
+
   completeTask: async (id) => {
-    // Virtual recurrence instance: completing skips just this date.
+    // Virtual recurrence instance: checking toggles just this date
+    // (skip = done, unskip = back to todo). Other dates are untouched.
     if (typeof id === 'string' && id.includes('@')) {
       const [baseId, dateKey] = id.split('@');
-      await get().skipOccurrence(baseId, dateKey);
+      await get().toggleOccurrence(baseId, dateKey);
       return;
     }
     // Completing a recurring SERIES checks off only today's occurrence.
@@ -661,6 +685,16 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     }));
     try {
       await api.skipOccurrence(baseId, dateKey);
+    } catch (e) {
+      throw e;
+    }
+    await get().fetchRecurring().catch(() => {});
+    await get().refreshCurrentView({ silent: true }).catch(() => {});
+  },
+
+  unskipOccurrence: async (baseId, dateKey) => {
+    try {
+      await api.unskipOccurrence(baseId, dateKey);
     } catch (e) {
       throw e;
     }

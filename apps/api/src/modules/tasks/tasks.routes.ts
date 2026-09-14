@@ -365,6 +365,34 @@ router.post('/:id/skip-occurrence', async (req: AuthRequest, res, next) => {
   }
 });
 
+// Unskip a recurrence instance (uncheck a completed/skipped date): the
+// instance reappears as not completed. Other dates are untouched.
+router.delete('/:id/unskip-occurrence', async (req: AuthRequest, res, next) => {
+  try {
+    const { date } = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(req.body);
+    const existing = await prisma.task.findFirst({
+      where: { id: req.params.id, creatorId: req.userId, isDeleted: false },
+    });
+    if (!existing || existing.recurrenceType === 'NONE') {
+      throw new AppError(404, 'Повторяющаяся задача не найдена');
+    }
+    let rule: { interval?: number; end?: string; skip?: string[] } = {};
+    try {
+      rule = existing.recurrenceRule ? JSON.parse(existing.recurrenceRule) : {};
+    } catch {
+      rule = {};
+    }
+    const skip = (Array.isArray(rule.skip) ? rule.skip : []).filter((d) => d !== date);
+    await prisma.task.update({
+      where: { id: existing.id },
+      data: { recurrenceRule: JSON.stringify({ ...rule, skip: skip.slice(-500) }) },
+    });
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 // --- Trash & Archive (before /:id to avoid param capture) ---
 

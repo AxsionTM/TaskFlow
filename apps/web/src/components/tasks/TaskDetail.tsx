@@ -30,7 +30,7 @@ import { cn, formatDate, priorityLabels } from '@/lib/utils';
 import { TAG_COLORS, TAG_ICONS, randomTagColor } from '@/lib/tags';
 import { TagIcon } from '@/components/tasks/TagIcon';
 import { useNotesStore } from '@/stores/notes';
-import { recurrenceLabel } from '@/lib/recurrence';
+import { recurrenceLabel, parseRecurrenceRule } from '@/lib/recurrence';
 
 const PRIORITIES = [
   { value: 'NONE', label: 'Нет', color: 'bg-emerald-600' },
@@ -237,10 +237,11 @@ const handleDueDateChange = (value: string) => {
 
   const handleComplete = async () => {
     if (!selectedTaskId) return;
-    // Opened from a recurrence instance: check off THAT date, not today.
+    // Opened from a recurrence instance: toggle THAT date (skip = done,
+    // unskip = back to todo). Other dates are untouched.
     if (selectedOccurrenceKey) {
-      const { skipOccurrence } = useTasksStore.getState();
-      await skipOccurrence(selectedTaskId, selectedOccurrenceKey);
+      const { toggleOccurrence } = useTasksStore.getState();
+      await toggleOccurrence(selectedTaskId, selectedOccurrenceKey);
       await loadTask();
       return;
     }
@@ -250,7 +251,22 @@ const handleDueDateChange = (value: string) => {
 
   const handleDelete = async () => {
     if (!selectedTaskId) return;
+    // Opened from a recurrence instance: delete ONLY that date by default.
+    if (selectedOccurrenceKey) {
+      if (!confirm(`Удалить повтор за ${occInfo?.dateStr || selectedOccurrenceKey}?\nОстальные дни останутся.`)) return;
+      const { skipOccurrence } = useTasksStore.getState();
+      await skipOccurrence(selectedTaskId, selectedOccurrenceKey);
+      setSelectedTask(null);
+      return;
+    }
     if (!confirm('Удалить задачу?')) return;
+    await deleteTask(selectedTaskId);
+    setSelectedTask(null);
+  };
+
+  const handleDeleteSeries = async () => {
+    if (!selectedTaskId) return;
+    if (!confirm('Удалить ВСЮ серию повторений?\nВсе дни, включая будущие, будут удалены.')) return;
     await deleteTask(selectedTaskId);
     setSelectedTask(null);
   };
@@ -435,9 +451,19 @@ const handleDueDateChange = (value: string) => {
 
   if (!selectedTaskId) return null;
 
+  // Whether the opened recurrence instance is checked off (in the skip list).
+  const occDone = (() => {
+    if (!selectedOccurrenceKey || !task) return false;
+    try {
+      return (parseRecurrenceRule(task).skip || []).includes(selectedOccurrenceKey);
+    } catch {
+      return false;
+    }
+  })();
+
   // When opened from a recurrence instance (calendar/day views), show which
   // date this instance belongs to — the form below edits the whole series.
-  const occBanner = (() => {
+  const occInfo = (() => {
     if (!selectedOccurrenceKey || !task) return null;
     if (!task.recurrenceType || task.recurrenceType === 'NONE') return null;
     const parts = String(selectedOccurrenceKey).split('-').map(Number);
@@ -470,10 +496,10 @@ const handleDueDateChange = (value: string) => {
         </button>
       </div>
 
-      {occBanner && (
+      {occInfo && (
         <div className="mx-4 mt-3 rounded-xl border border-violet-500/40 bg-violet-500/10 px-3 py-2 text-xs">
-          <span className="font-semibold text-violet-300">Повтор за {occBanner.dateStr}</span>
-          {occBanner.time && <span className="text-muted-foreground"> · {occBanner.time}</span>}
+          <span className="font-semibold text-violet-300">Повтор за {occInfo.dateStr}</span>
+          {occInfo.time && <span className="text-muted-foreground"> · {occInfo.time}</span>}
           <span className="block text-muted-foreground">Изменения действуют на всю серию.</span>
         </div>
       )}
@@ -488,7 +514,7 @@ const handleDueDateChange = (value: string) => {
           <div className="px-4 pt-4 pb-2 flex items-start gap-3">
             <div className="pt-1" onClick={handleComplete}>
               <Checkbox
-                checked={task.status === 'COMPLETED'}
+                checked={occDone || task.status === 'COMPLETED'}
                 priority={priority}
               />
             </div>
@@ -1109,15 +1135,38 @@ const handleDueDateChange = (value: string) => {
                 Архивировать
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={handleDelete}
-            >
-              <Trash2 className="h-4 w-4" />
-              Удалить задачу
-            </Button>
+            {occInfo && task.recurrenceType !== 'NONE' ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={handleDelete}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Удалить повтор за {occInfo.dateStr}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={handleDeleteSeries}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Удалить всю серию
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={handleDelete}
+              >
+                <Trash2 className="h-4 w-4" />
+                Удалить задачу
+              </Button>
+            )}
           </div>
         </div>
       )}

@@ -131,7 +131,7 @@ export function CalendarView() {
       }
       const recurring = task.recurrenceType && task.recurrenceType !== 'NONE';
       if (recurring) {
-        for (const occ of expandRecurrence(task, monthRange.from, monthRange.to)) {
+        for (const occ of expandRecurrence(task, monthRange.from, monthRange.to, 60, true)) {
           push(occ.occurrenceDate, occ);
         }
         continue;
