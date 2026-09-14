@@ -289,6 +289,11 @@ router.get('/overdue', async (req: AuthRequest, res, next) => {
         status: { not: 'COMPLETED' },
         parentId: null,
         dueDate: { lt: now },
+        // Recurring series are judged by their occurrences (expanded
+        // client-side per day), never by their stale anchor dates — otherwise
+        // a series looks permanently overdue, its checkbox does nothing, and
+        // the 24h auto-cleanup deletes the whole series.
+        recurrenceType: 'NONE',
       },
       include: {
         tags: { include: { tag: true } },

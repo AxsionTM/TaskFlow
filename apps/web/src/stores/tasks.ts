@@ -108,6 +108,9 @@ function matchesTodayFilter(task: Task): boolean {
 function matchesOverdueFilter(task: Task): boolean {
   if (!task || task.parentId) return false;
   if (task.status === 'COMPLETED') return false;
+  // Same as the server /overdue endpoint: recurring series live by their
+  // occurrences, never count as overdue by their anchor dates.
+  if (isRecurring(task)) return false;
   if (!task.dueDate) return false;
   const { start } = dayBounds();
   return new Date(task.dueDate).getTime() < start.getTime();
