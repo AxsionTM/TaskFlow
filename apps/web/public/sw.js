@@ -1,4 +1,4 @@
-const CACHE = 'taskflow-v4';
+const CACHE = 'taskflow-v5';
 const ASSETS = ['/', '/login', '/register', '/app'];
 
 self.addEventListener('install', (event) => {

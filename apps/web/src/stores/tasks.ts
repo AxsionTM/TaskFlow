@@ -554,13 +554,15 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     }
     // Completing a recurring SERIES checks off only today's occurrence.
     // Completing the series itself would vanish it from every view (the
-    // server excludes COMPLETED series) with no way back.
+    // server excludes COMPLETED series) with no way back — EXCEPT unchecking:
+    // an already-COMPLETED series falls through to the normal toggle below,
+    // which revives it back to TODO (recovery path for series stuck completed).
     if (typeof id === 'string') {
       const base =
         get().recurringTasks.find((item) => item.id === id) ??
         get().tasks.find((item) => item.id === id) ??
         get().todayTasks.find((item) => item.id === id);
-      if (base && isRecurring(base)) {
+      if (base && isRecurring(base) && base.status !== 'COMPLETED') {
         const now = new Date();
         const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
           now.getDate()
