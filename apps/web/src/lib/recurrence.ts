@@ -13,7 +13,7 @@ export type RecurrenceRule = {
  * checkboxes, notifications) — only creating/changing repeats is closed.
  * Flip back to false to reopen.
  */
-export const REPEAT_UNDER_MAINTENANCE = true;
+export const REPEAT_UNDER_MAINTENANCE = false;
 
 export function parseRecurrenceRule(task: any): RecurrenceRule {
   const raw = task?.recurrenceRule;
