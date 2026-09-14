@@ -30,7 +30,7 @@ import { cn, formatDate, priorityLabels } from '@/lib/utils';
 import { TAG_COLORS, TAG_ICONS, randomTagColor } from '@/lib/tags';
 import { TagIcon } from '@/components/tasks/TagIcon';
 import { useNotesStore } from '@/stores/notes';
-import { recurrenceLabel, parseRecurrenceRule } from '@/lib/recurrence';
+import { recurrenceLabel, parseRecurrenceRule, REPEAT_UNDER_MAINTENANCE } from '@/lib/recurrence';
 
 const PRIORITIES = [
   { value: 'NONE', label: 'Нет', color: 'bg-emerald-600' },
@@ -712,7 +712,8 @@ const handleDueDateChange = (value: string) => {
                   <select
                     value={recurType}
                     onChange={(e) => saveRecurrence(e.target.value, recurEnd)}
-                    className="mt-0.5 w-full rounded-md border border-input bg-card px-2 py-1 text-sm"
+                    disabled={REPEAT_UNDER_MAINTENANCE}
+                    className="mt-0.5 w-full rounded-md border border-input bg-card px-2 py-1 text-sm disabled:opacity-40"
                   >
                     <option value="NONE">Нет</option>
                     <option value="DAILY">Ежедневно</option>
@@ -725,12 +726,17 @@ const handleDueDateChange = (value: string) => {
                   <input
                     type="date"
                     value={recurEnd}
-                    disabled={recurType === 'NONE'}
+                    disabled={recurType === 'NONE' || REPEAT_UNDER_MAINTENANCE}
                     onChange={(e) => saveRecurrence(recurType, e.target.value)}
                     className="mt-0.5 w-full rounded-md border border-input bg-card px-2 py-1 text-sm disabled:opacity-40"
                   />
                 </div>
               </div>
+              {REPEAT_UNDER_MAINTENANCE && (
+                <p className="ml-6 mt-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-medium text-amber-400">
+                  Повтор временно в техработе — скоро вернём.
+                </p>
+              )}
             </div>
 
             {/* Project */}

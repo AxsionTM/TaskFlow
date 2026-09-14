@@ -9,6 +9,7 @@ import { useProjectsStore } from '@/stores/projects';
 import { api } from '@/lib/api';
 import { cn, priorityLabels } from '@/lib/utils';
 import { TAG_COLORS, TAG_ICONS, randomTagColor } from '@/lib/tags';
+import { REPEAT_UNDER_MAINTENANCE } from '@/lib/recurrence';
 import { TagIcon } from '@/components/tasks/TagIcon';
 
 const PRIORITIES = [
@@ -489,7 +490,8 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
               <select
                 value={recurType}
                 onChange={(e) => setRecurType(e.target.value)}
-                className="mt-0.5 flex h-9 w-full rounded-md border border-input bg-card px-2 text-sm"
+                disabled={REPEAT_UNDER_MAINTENANCE}
+                className="mt-0.5 flex h-9 w-full rounded-md border border-input bg-card px-2 text-sm disabled:opacity-40"
               >
                 <option value="NONE">Нет</option>
                 <option value="DAILY">Ежедневно</option>
@@ -502,12 +504,17 @@ export function CreateTaskModal({ open, onClose, initialDate }: Props) {
               <input
                 type="date"
                 value={recurEnd}
-                disabled={recurType === 'NONE'}
+                disabled={recurType === 'NONE' || REPEAT_UNDER_MAINTENANCE}
                 onChange={(e) => setRecurEnd(e.target.value)}
                 className="mt-0.5 flex h-9 w-full rounded-md border border-input bg-card px-2 text-sm disabled:opacity-40"
               />
             </div>
           </div>
+          {REPEAT_UNDER_MAINTENANCE && (
+            <p className="mt-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-medium text-amber-400">
+              Повтор временно в техработе — скоро вернём.
+            </p>
+          )}
 
           {/* Reminder + repeat */}
           <div className="grid grid-cols-2 gap-2">

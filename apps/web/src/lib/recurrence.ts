@@ -6,6 +6,15 @@ export type RecurrenceRule = {
   skip?: string[];
 };
 
+/**
+ * Kill-switch for the "Повтор" (repeat) feature: while true, the repeat
+ * controls in task creation/editing are disabled for EVERYONE with a
+ * yellow "в техработе" notice. Existing series keep working (display,
+ * checkboxes, notifications) — only creating/changing repeats is closed.
+ * Flip back to false to reopen.
+ */
+export const REPEAT_UNDER_MAINTENANCE = true;
+
 export function parseRecurrenceRule(task: any): RecurrenceRule {
   const raw = task?.recurrenceRule;
   if (!raw || typeof raw !== 'string') return {};
