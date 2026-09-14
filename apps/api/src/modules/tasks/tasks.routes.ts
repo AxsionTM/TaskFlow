@@ -57,6 +57,31 @@ const checklistItemSchema = z.object({
 });
 
 // recurrenceRule: object form is normalized to a JSON string; end date validated.
+/**
+ * Day bounds in the USER's timezone. The client sends its local day key
+ * (YYYY-MM-DD) and tzOffset (minutes east of UTC). Without them we fall back
+ * to the server-local day (legacy). This matters: on a UTC server, users at
+ * UTC+7 lost all tasks before ~07:00 local from /today, and tasks due after
+ * midnight local were wrongly flagged overdue.
+ */
+function userDayBounds(tzOffsetRaw: unknown, dayKeyRaw: unknown): { start: Date; end: Date } {
+  const tz = typeof tzOffsetRaw === 'string' && tzOffsetRaw !== '' ? Number(tzOffsetRaw) : NaN;
+  const key = typeof dayKeyRaw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dayKeyRaw) ? dayKeyRaw : null;
+  if (!Number.isInteger(tz) || tz < -720 || tz > 840 || !key) {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+  const start = new Date(`${key}T00:00:00Z`);
+  start.setUTCMinutes(start.getUTCMinutes() - tz);
+  const end = new Date(`${key}T00:00:00Z`);
+  end.setUTCMinutes(end.getUTCMinutes() - tz + 24 * 60 - 1);
+  end.setUTCSeconds(59, 999);
+  return { start, end };
+}
+
 function normalizeRecurrenceRule(rule: unknown): string | null | undefined {
   if (rule === undefined) return undefined;
   if (rule === null) return null;
@@ -215,10 +240,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
 router.get('/today', async (req: AuthRequest, res, next) => {
   try {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
+    const { start, end } = userDayBounds(req.query.tzOffset, req.query.day);
 
     const tasks = await prisma.task.findMany({
       where: {
@@ -278,8 +300,8 @@ router.get('/today', async (req: AuthRequest, res, next) => {
 
 router.get('/overdue', async (req: AuthRequest, res, next) => {
   try {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+    // Overdue = due before the start of the USER's today (not UTC midnight).
+    const { start: now } = userDayBounds(req.query.tzOffset, req.query.day);
 
     const tasks = await prisma.task.findMany({
       where: {

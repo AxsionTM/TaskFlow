@@ -131,12 +131,26 @@ class ApiClient {
     return this.request<{ tasks: any[] }>(`/tasks${query}`);
   }
 
+  /** Local day key + timezone offset so the server counts the USER's day, not UTC. */
+  private dayQuery(): string {
+    try {
+      const now = new Date();
+      const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+        now.getDate()
+      ).padStart(2, '0')}`;
+      const tzOffset = -now.getTimezoneOffset();
+      return `?day=${day}&tzOffset=${tzOffset}`;
+    } catch {
+      return '';
+    }
+  }
+
   getTodayTasks() {
-    return this.request<{ tasks: any[] }>('/tasks/today');
+    return this.request<{ tasks: any[] }>(`/tasks/today${this.dayQuery()}`);
   }
 
   getOverdueTasks() {
-    return this.request<{ tasks: any[] }>('/tasks/overdue');
+    return this.request<{ tasks: any[] }>(`/tasks/overdue${this.dayQuery()}`);
   }
 
   getRecurringTasks() {

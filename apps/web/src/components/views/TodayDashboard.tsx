@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ListChecks, Timer, Flame, Target, Plus, CalendarDays } from 'lucide-react';
-import { useTasksStore } from '@/stores/tasks';
+import { useTasksStore, matchesTodayFilter } from '@/stores/tasks';
 import { useHabitsStore } from '@/stores/habits';
 import { useGoalsStore } from '@/stores/goals';
 import { useFocusStore } from '@/stores/focus';
@@ -45,7 +45,7 @@ function Tile({
 }
 
 export function TodayDashboard() {
-  const { todayTasks, recurringTasks, fetchRecurring, isLoading, setCurrentView } = useTasksStore();
+  const { todayTasks, tasks, recurringTasks, fetchRecurring, isLoading, setCurrentView } = useTasksStore();
   const { habits, fetchHabits } = useHabitsStore();
   const { goals, fetchGoals } = useGoalsStore();
   const { sessions, fetchStats, fetchSessions } = useFocusStore();
@@ -65,8 +65,17 @@ export function TodayDashboard() {
     const m = String(key.getMonth() + 1).padStart(2, '0');
     const d = String(key.getDate()).padStart(2, '0');
     const dayKey = `${y}-${m}-${d}`;
-    return mergeWithOccurrences(todayTasks, recurringTasks, dayKey, dayKey);
-  }, [todayTasks, recurringTasks]);
+    // Union of every loaded list (like the agenda does): a task that is
+    // relevant today must show here even if one endpoint missed it.
+    // Completed-today tasks are kept visible (checked), not dropped.
+    const merged = mergeWithOccurrences([...todayTasks, ...tasks], recurringTasks, dayKey, dayKey);
+    const seen = new Set<string>();
+    return merged.filter((t: any) => {
+      if (!t || seen.has(t.id)) return false;
+      seen.add(t.id);
+      return matchesTodayFilter(t);
+    });
+  }, [todayTasks, tasks, recurringTasks]);
 
   const taskScore = (t: any): number => {
     const kids = (t.children || []).filter((c: any) => !c.isDeleted);

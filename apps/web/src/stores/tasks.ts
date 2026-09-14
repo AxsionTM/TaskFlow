@@ -97,7 +97,7 @@ function dayBounds() {
   return { start, end };
 }
 
-function matchesTodayFilter(task: Task): boolean {
+export function matchesTodayFilter(task: Task): boolean {
   if (!task || task.parentId) return false;
   if (task.status === 'COMPLETED') {
     if (!task.completedAt) return true;
