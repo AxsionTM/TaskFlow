@@ -50,6 +50,8 @@ interface TasksState {
   isLoading: boolean;
 
   selectedTaskId: string | null;
+  /** Date key (YYYY-MM-DD) of the opened recurrence instance, if any. */
+  selectedOccurrenceKey: string | null;
 
   currentView: string;
   currentProjectId: string | null;
@@ -281,6 +283,8 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   isLoading: false,
 
   selectedTaskId: null,
+
+  selectedOccurrenceKey: null,
 
   currentView: loadStoredView(),
 
@@ -666,8 +670,10 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
   setSelectedTask: (id) =>
     set({
-      // Occurrence ids open their base task detail.
+      // Occurrence ids open their base task detail, remembering which
+      // instance date was opened so the detail can show occurrence context.
       selectedTaskId: id && id.includes('@') ? id.split('@')[0] : id,
+      selectedOccurrenceKey: id && id.includes('@') ? id.split('@')[1] : null,
     }),
 
   setCurrentView: (view) => {
@@ -677,6 +683,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     set({
       currentView: view,
       selectedTaskId: null,
+      selectedOccurrenceKey: null,
     });
   },
 

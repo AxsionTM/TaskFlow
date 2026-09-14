@@ -297,7 +297,7 @@ export function CalendarView() {
                               key={task.id}
                               draggable={!occ}
                               onDragStart={(e) => onDragStart(e, occ ? (task as any).baseId : task.id)}
-                              onClick={(e) => { e.stopPropagation(); setSelectedTask(occ ? (task as any).baseId : task.id); }}
+                              onClick={(e) => { e.stopPropagation(); setSelectedTask(task.id); }}
                               title={`${task.title}${timeLabel(task.dueDate) ? ` · ${timeLabel(task.dueDate)}` : ''}${span ? ' · период' : ''}${occ ? ' · повтор' : ''}`}
                               className={cn(
                                 'flex w-full items-center gap-1.5 rounded-lg border px-1.5 py-[4px] text-left transition-all cursor-grab active:cursor-grabbing',

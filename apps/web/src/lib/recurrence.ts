@@ -155,21 +155,16 @@ export function mergeWithOccurrences(baseList: any[], recurring: any[], fromKey:
   const rec = Array.isArray(recurring) ? recurring.filter((t) => isRecurring(t)) : [];
   if (!rec.length) return list;
   const occurrences = rec.flatMap((t) => expandRecurrence(t, fromKey, toKey));
-  // Every recurring base is represented by its occurrences inside day views,
-  // never by the base row itself. Using ALL base ids (not only those with
-  // occurrences in range) also hides the base on days whose instance was
-  // skipped via skip-occurrence — otherwise the completed/deleted instance
-  // would reappear as the base task (the server /today query is span-based
-  // and doesn't know about the client-side skip list).
+  // Every recurring base is represented ONLY by its occurrences — the base
+  // row itself (with the stale creation dates) must never render in day
+  // views. Hiding by ALL base ids (not only those with occurrences in range)
+  // also keeps skipped instances hidden — otherwise a completed/skipped
+  // instance would reappear as the base task with the wrong date (the server
+  // /today query is span-based and doesn't know the client-side skip list).
   const covered = new Set(rec.map((o) => o.id));
   const rest = list.filter((t) => {
     if (isOccurrence(t)) return true;
-    if (covered.has(t.id)) {
-      // Base is represented by occurrences; keep it only outside the range.
-      const keys = taskSpanKeys(t);
-      return !keys.some((k) => k >= fromKey && k <= toKey);
-    }
-    return true;
+    return !covered.has(t.id);
   });
   const merged = [...rest, ...occurrences];
   merged.sort((a: any, b: any) => {

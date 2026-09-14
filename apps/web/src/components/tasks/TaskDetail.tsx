@@ -42,6 +42,7 @@ const PRIORITIES = [
 export function TaskDetail() {
   const { selectedTaskId, setSelectedTask, updateTask, deleteTask, completeTask, createTask, setCurrentView } =
     useTasksStore();
+  const selectedOccurrenceKey = useTasksStore((s) => (s as any).selectedOccurrenceKey as string | null);
   const { projects } = useProjectsStore();
   const openForTask = useNotesStore((s) => s.openForTask);
 
@@ -236,6 +237,13 @@ const handleDueDateChange = (value: string) => {
 
   const handleComplete = async () => {
     if (!selectedTaskId) return;
+    // Opened from a recurrence instance: check off THAT date, not today.
+    if (selectedOccurrenceKey) {
+      const { skipOccurrence } = useTasksStore.getState();
+      await skipOccurrence(selectedTaskId, selectedOccurrenceKey);
+      await loadTask();
+      return;
+    }
     await completeTask(selectedTaskId);
     await loadTask();
   };
@@ -427,6 +435,28 @@ const handleDueDateChange = (value: string) => {
 
   if (!selectedTaskId) return null;
 
+  // When opened from a recurrence instance (calendar/day views), show which
+  // date this instance belongs to — the form below edits the whole series.
+  const occBanner = (() => {
+    if (!selectedOccurrenceKey || !task) return null;
+    if (!task.recurrenceType || task.recurrenceType === 'NONE') return null;
+    const parts = String(selectedOccurrenceKey).split('-').map(Number);
+    if (parts.length !== 3 || parts.some((n) => !n)) return null;
+    const dateStr = `${String(parts[2]).padStart(2, '0')}.${String(parts[1]).padStart(2, '0')}.${parts[0]}`;
+    const t = (iso: any) => {
+      try {
+        const x = new Date(iso);
+        return Number.isNaN(x.getTime()) ? '' : x.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      } catch {
+        return '';
+      }
+    };
+    const st = task.startDate ? t(task.startDate) : '';
+    const dt = task.dueDate ? t(task.dueDate) : '';
+    const time = st && dt && st !== dt ? `${st}–${dt}` : st || dt;
+    return { dateStr, time };
+  })();
+
   return (
     <aside className="task-detail-panel fixed inset-y-0 right-0 z-[80] flex h-[100dvh] w-[min(380px,100vw)] shrink-0 flex-col border-l bg-card shadow-2xl transition-transform duration-200 lg:static lg:z-auto lg:h-full lg:w-[380px] lg:shadow-none">
       {/* Header */}
@@ -439,6 +469,14 @@ const handleDueDateChange = (value: string) => {
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {occBanner && (
+        <div className="mx-4 mt-3 rounded-xl border border-violet-500/40 bg-violet-500/10 px-3 py-2 text-xs">
+          <span className="font-semibold text-violet-300">Повтор за {occBanner.dateStr}</span>
+          {occBanner.time && <span className="text-muted-foreground"> · {occBanner.time}</span>}
+          <span className="block text-muted-foreground">Изменения действуют на всю серию.</span>
+        </div>
+      )}
 
       {loading || !task ? (
         <div className="flex-1 flex items-center justify-center">

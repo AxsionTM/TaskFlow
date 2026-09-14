@@ -5,6 +5,7 @@ import { useTasksStore } from "@/stores/tasks";
 import { useBirthdaysStore, isSameMonthDay } from "@/stores/birthdays";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { mergeWithOccurrences } from "@/lib/recurrence";
 import { TagPill } from "@/components/tasks/TagPill";
 import { TagIcon } from "@/components/tasks/TagIcon";
 import { CreateTaskModal } from "@/components/tasks/CreateTaskModal";
@@ -194,16 +195,24 @@ function buildTimedLayout(tasks:any[], day:Date){
 }
 
 export function AgendaView(){
-  const {tasks,todayTasks,overdueTasks,setSelectedTask,completeTask,selectedTaskId,fetchTasks,fetchToday,fetchOverdue,updateTask}=useTasksStore();
+  const {tasks,todayTasks,overdueTasks,recurringTasks,setSelectedTask,completeTask,selectedTaskId,fetchTasks,fetchToday,fetchOverdue,fetchRecurring,updateTask}=useTasksStore();
   const [dayOffset,setDayOffset]=useState(0);const [dragOverMinute,setDragOverMinute]=useState<number|null>(null);  const [query,setQuery]=useState("");const [activeTag,setActiveTag]=useState("");const [taskOpen,setTaskOpen]=useState(false);const [agendaMode,setAgendaMode]=useState<"list"|"timeline">("list");
   const { items: birthdays, fetch: fetchBirthdays } = useBirthdaysStore();
-  useEffect(()=>{fetchTasks({includeCompleted:"false"});fetchToday();fetchOverdue();fetchBirthdays();},[fetchTasks,fetchToday,fetchOverdue,fetchBirthdays]);
+  useEffect(()=>{fetchTasks({includeCompleted:"false"});fetchToday();fetchOverdue();fetchRecurring();fetchBirthdays();},[fetchTasks,fetchToday,fetchOverdue,fetchRecurring,fetchBirthdays]);
   const day=useMemo(()=>{const d=new Date();d.setDate(d.getDate()+dayOffset);return startOfDay(d);},[dayOffset]);
   const weekStrip=useMemo(()=>{const now=new Date();const dow=(now.getDay()+6)%7;const monday=new Date(now);monday.setDate(now.getDate()-dow);return Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);const off=Math.round((startOfDay(d).getTime()-startOfDay(now).getTime())/86400000);return {date:d,offset:off,wd:d.toLocaleDateString("ru-RU",{weekday:"short"}),num:d.getDate()};});},[]);
   const dayKey=`${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,"0")}-${String(day.getDate()).padStart(2,"0")}`;
   const dayBirthdays=useMemo(()=>birthdays.filter(b=>isSameMonthDay(b.date,day)),[birthdays,day]);
   const label=dayLabel(day);
-  const dayTasksBase=useMemo(()=>{const all=[...tasks,...todayTasks,...overdueTasks],seen=new Set<string>(),list:any[]=[];const dayStart=new Date(day),dayEnd=new Date(day);dayEnd.setHours(23,59,59,999);for(const t of all){if(seen.has(t.id)||t.status==="COMPLETED"||t.parentId)continue;const start=t.startDate?new Date(t.startDate):null,due=t.dueDate?new Date(t.dueDate):null;if(!start&&!due)continue;const visible=(start?start<=dayEnd:true)&&(due?due>=dayStart:true);if(visible){seen.add(t.id);list.push(t);}}return list;},[tasks,todayTasks,overdueTasks,day]);
+  const dayTasksBase=useMemo(()=>{
+    // Recurring series are expanded into per-day occurrences (with that
+    // day's dates); the stale-dated base row itself never renders here.
+    const merged=mergeWithOccurrences([...tasks,...todayTasks,...overdueTasks],recurringTasks,dayKey,dayKey);
+    const seen=new Set<string>(),list:any[]=[];
+    const dayStart=new Date(day),dayEnd=new Date(day);dayEnd.setHours(23,59,59,999);
+    for(const t of merged){if(seen.has(t.id)||t.status==="COMPLETED"||t.parentId)continue;const start=t.startDate?new Date(t.startDate):null,due=t.dueDate?new Date(t.dueDate):null;if(!start&&!due)continue;const visible=(start?start<=dayEnd:true)&&(due?due>=dayStart:true);if(visible){seen.add(t.id);list.push(t);}}
+    return list;
+  },[tasks,todayTasks,overdueTasks,recurringTasks,day,dayKey]);
   const agendaTags=useMemo(()=>{const m=new Map<string,{id:string;name:string;color:string;icon?:string|null}>();for(const t of dayTasksBase){for(const tt of t.tags||[]){const id=tt.tag?.id||tt.tagId;if(!id||m.has(id))continue;m.set(id,{id,name:tt.tag?.name||"Тег",color:tt.tag?.color||"#888888",icon:tt.tag?.icon||null});}}return Array.from(m.values());},[dayTasksBase]);
   const dayTasks=useMemo(()=>{let list=dayTasksBase;const q=query.trim().toLowerCase();if(q){list=list.filter(t=>(t.title||"").toLowerCase().includes(q));}if(activeTag){list=list.filter(t=>(t.tags||[]).some((tt:any)=>tt.tag?.id===activeTag||tt.tagId===activeTag));}return list;},[dayTasksBase,query,activeTag]);
   const allDay=dayTasks.filter(t=>t.isAllDay!==false&&!t.startDate);const timed=dayTasks.filter(t=>!(t.isAllDay!==false&&!t.startDate));
