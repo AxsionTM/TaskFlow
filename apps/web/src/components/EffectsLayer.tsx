@@ -14,16 +14,28 @@ export function EffectsLayer() {
     { id: number; left: number; top: number; size: number; delay: number; dur: number; kind: 'dot' | 'spark' }[]
   >([]);
   const [mounted, setMounted] = useState(false);
+  const [liteMode, setLiteMode] = useState(false);
 
   useEffect(() => {
     initEffectsFromStorage();
     setMounted(true);
-    const isMobile =
-      typeof window !== 'undefined' &&
-      (window.matchMedia('(max-width: 767px)').matches ||
-        window.matchMedia('(pointer: coarse)').matches);
-    const dotsCount = isMobile ? Math.ceil(STAR_COUNT / 2) : STAR_COUNT;
-    const sparksCount = isMobile ? 0 : SPARK_COUNT;
+    let lite = false;
+    try {
+      lite =
+        window.matchMedia('(max-width: 767px)').matches ||
+        window.matchMedia('(pointer: coarse)').matches ||
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {}
+    setLiteMode(lite);
+    // Mobile / reduced-motion: static vignette only, no animated spans at
+    // all — even a dozen compositor animations jank theme switches and
+    // scrolling on weak phone GPUs.
+    if (lite) {
+      setStars([]);
+      return;
+    }
+    const dotsCount = STAR_COUNT;
+    const sparksCount = SPARK_COUNT;
     const dots = Array.from({ length: dotsCount }, (_, i) => ({
       id: i,
       left: Math.random() * 100,

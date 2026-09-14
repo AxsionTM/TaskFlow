@@ -375,6 +375,15 @@ body {
     animation-duration: 8s;
   }
 
+  /*
+   * Long task lists: let the browser skip off-screen rows entirely.
+   * Big scroll + repaint win on phones; desktop rendering is untouched.
+   */
+  .tf-task-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 64px;
+  }
+
   html.effects-on main .group:hover,
   html.effects-on main button:hover:not(:disabled),
   html.effects-on main [role="checkbox"]:hover,
@@ -439,6 +448,18 @@ body {
   .tf-glow-border::before {
     animation: none !important;
   }
+}
+
+/*
+ * Theme swap guard (see ThemePicker switchTheme): changing the theme class
+ * repaints every hsl(var(--…)) surface at once. Freezing transitions and
+ * animations for a few hundred ms turns phone jank into one clean repaint.
+ */
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+  animation: none !important;
 }
 
 /* ===== TaskFlow mobile UX hardening ===== */

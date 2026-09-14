@@ -57,7 +57,7 @@ export function TaskCard({
     <div
       onClick={() => setSelectedTask(task.id)}
       className={cn(
-        'px-3.5 py-3 flex items-center gap-3 cursor-pointer transition-transform hover:scale-[1.005]',
+        'tf-task-row px-3.5 py-3 flex items-center gap-3 cursor-pointer transition-transform hover:scale-[1.005]',
         flat ? 'rounded-none' : 'tf-glass rounded-2xl'
       )}
     >

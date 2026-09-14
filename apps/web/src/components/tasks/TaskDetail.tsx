@@ -262,6 +262,7 @@ const handleDueDateChange = (value: string) => {
 
   const handleDeleteChecklist = async (itemId: string) => {
     if (!selectedTaskId) return;
+    if (!confirm('Удалить пункт чек-листа?')) return;
     await api.deleteChecklistItem(selectedTaskId, itemId);
     await loadTask();
   };
@@ -913,6 +914,7 @@ const handleDueDateChange = (value: string) => {
                     className="shrink-0 rounded p-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-opacity"
                     onClick={async (e) => {
                       e.stopPropagation();
+                      if (!confirm(`Удалить подзадачу «${child.title}»?`)) return;
                       await deleteTask(child.id);
                       await loadTask();
                     }}

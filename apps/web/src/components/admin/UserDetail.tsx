@@ -6,10 +6,11 @@ import { api } from '@/lib/api';
 import { Skeleton, EmptyState, ConfirmModal, Field, inputCls, fmtDate, fmtDay } from './ui';
 import { Tasks } from './Tasks';
 import { ImpersonateView } from './ImpersonateView';
+import { Forensics } from './Forensics';
 import { cn } from '@/lib/utils';
 
 type Toast = (text: string, ok?: boolean) => void;
-type Tab = 'profile' | 'activity' | 'tasks' | 'security' | 'actions';
+type Tab = 'profile' | 'activity' | 'tasks' | 'forensics' | 'security' | 'actions';
 
 function Modal({
   title,
@@ -35,6 +36,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'profile', label: 'Profile' },
   { id: 'activity', label: 'Activity' },
   { id: 'tasks', label: 'Tasks' },
+  { id: 'forensics', label: 'Расследование' },
   { id: 'security', label: 'Security' },
   { id: 'actions', label: 'Admin Actions' },
 ];
@@ -164,6 +166,21 @@ export function UserDetail({
     }
   };
 
+  const doImpersonate = async () => {
+    setBusy(true);
+    try {
+      const res = await api.adminImpersonate(id);
+      if (!res.token) throw new Error('Сервер не выдал токен входа');
+      // Separate tab, token in fragment (never in server logs). Short-lived (15 min).
+      window.open(`/auth/impersonate#token=${encodeURIComponent(res.token)}`, '_blank', 'noopener');
+      toast('Открыта отдельная вкладка с аккаунтом пользователя');
+    } catch (e: any) {
+      toast(e.message || 'Не удалось войти в аккаунт', false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const doDelete = async () => {
     setBusy(true);
     try {
@@ -285,6 +302,8 @@ export function UserDetail({
         <Tasks onOpen={onOpenTask} initialTaskId={null} toast={toast} userOnly={id} />
       )}
 
+      {tab === 'forensics' && <Forensics userId={id} toast={toast} />}
+
       {tab === 'security' && (
         <div className="rounded-2xl border border-border/60 bg-card/70 p-4 sm:p-5">
           <h3 className="mb-3 text-sm font-semibold">Security</h3>
@@ -307,6 +326,9 @@ export function UserDetail({
             <button type="button" onClick={() => setTab('tasks')} className="h-11 rounded-xl border border-border/60 px-4 text-sm font-semibold hover:bg-accent">View Tasks</button>
             <button type="button" onClick={() => setViewAs(true)} className="flex h-11 items-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 text-sm font-semibold text-sky-300 hover:bg-sky-500/20">
               <Eye className="h-4 w-4" /> View as User
+            </button>
+            <button type="button" onClick={() => void doImpersonate()} disabled={busy} className="flex h-11 items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50">
+              <Eye className="h-4 w-4" /> Войти как (новая вкладка)
             </button>
             <button type="button" onClick={() => setModal('password')} className="h-11 rounded-xl border border-border/60 px-4 text-sm font-semibold hover:bg-accent">Change Password</button>
             <button type="button" onClick={() => setModal('role')} className="h-11 rounded-xl border border-border/60 px-4 text-sm font-semibold hover:bg-accent">Изменить роль</button>

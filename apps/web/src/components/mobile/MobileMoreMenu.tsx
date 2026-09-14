@@ -14,12 +14,15 @@ import {
   X,
   StickyNote,
   Bot,
+  ShieldCheck,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useTasksStore, type DisplayMode } from '@/stores/tasks';
+import { useAuthStore } from '@/stores/auth';
 import { ThemePicker } from '@/components/ThemePicker';
 import { cn } from '@/lib/utils';
 
-const TILES: { id: string; label: string; icon: any; mode?: DisplayMode }[] = [
+const TILES: { id: string; label: string; icon: any; mode?: DisplayMode; adminOnly?: boolean }[] = [
   { id: 'tomorrow', label: 'Завтра', icon: CalendarClock },
   { id: 'agenda', label: 'Повестка дня', icon: ListTodo },
   { id: 'calendar', label: 'Календарь', icon: CalendarDays },
@@ -32,14 +35,26 @@ const TILES: { id: string; label: string; icon: any; mode?: DisplayMode }[] = [
   { id: 'assistant', label: 'AI Ассистент', icon: Bot },
   { id: 'trash', label: 'Корзина', icon: Trash2 },
   { id: 'profile', label: 'Профиль', icon: User },
+  { id: '__admin', label: 'Админ', icon: ShieldCheck, adminOnly: true },
 ];
 
 export function MobileMoreMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { currentView, displayMode, setCurrentView, setCurrentProject, setDisplayMode } = useTasksStore();
+  const user = useAuthStore((s) => s.user);
+  const router = useRouter();
+  const isAdmin = user?.role === 'ADMIN';
+  const visibleTiles = TILES.filter((t) => !t.adminOnly || isAdmin);
 
   if (!open) return null;
 
   const go = (tile: (typeof TILES)[number]) => {
+    if (tile.id === '__admin') {
+      // Same-origin route, auth is shared with /app — guarded server-side
+      // by role too (/admin shows «Нет доступа» to non-admins).
+      router.push('/admin');
+      onClose();
+      return;
+    }
     setCurrentView(tile.id);
     setCurrentProject(null);
     if (tile.mode) setDisplayMode(tile.mode);
@@ -66,7 +81,7 @@ export function MobileMoreMenu({ open, onClose }: { open: boolean; onClose: () =
           </button>
         </div>
         <div className="grid grid-cols-2 gap-2.5">
-          {TILES.map((tile) => {
+          {visibleTiles.map((tile) => {
             const Icon = tile.icon;
             const active = tile.mode
               ? displayMode === tile.mode

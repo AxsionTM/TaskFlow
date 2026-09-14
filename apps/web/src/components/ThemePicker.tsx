@@ -21,6 +21,24 @@ function applyThemeClass(theme: string) {
   }
 }
 
+/**
+ * Theme swap repaints the whole tree (every hsl(var(--…)) surface). On
+ * phones that plus transitions/animations on hundreds of nodes = visible
+ * jank. Freeze transitions + animations for one frame batch, then release.
+ */
+function switchTheme(id: string, setTheme: (id: string) => void) {
+  try {
+    const root = document.documentElement;
+    root.classList.add('theme-switching');
+    setTheme(id);
+    applyThemeClass(id);
+    window.setTimeout(() => root.classList.remove('theme-switching'), 350);
+  } catch {
+    setTheme(id);
+    applyThemeClass(id);
+  }
+}
+
 export function ThemePicker({ compact }: { compact?: boolean }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -73,8 +91,7 @@ export function ThemePicker({ compact }: { compact?: boolean }) {
                   }}
                   onMouseLeave={() => setHoverId(null)}
                   onClick={() => {
-                    setTheme(t.id);
-                    applyThemeClass(t.id);
+                    switchTheme(t.id, setTheme);
                     setOpen(false);
                   }}
                   className={cn(

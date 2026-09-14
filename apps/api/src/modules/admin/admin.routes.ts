@@ -5,6 +5,7 @@ import { prisma } from '../../common/utils/prisma';
 import { AppError } from '../../common/middleware/error-handler';
 import { authMiddleware, AuthRequest, invalidateMaintenanceCache } from '../../common/middleware/auth';
 import { requireAdmin } from '../../common/middleware/admin';
+import { signToken } from '../../common/utils/jwt';
 import { invalidateAiFlagCache } from '../ai/ai.routes';
 
 const router = Router();
@@ -1089,11 +1090,87 @@ router.post('/users/:id/impersonate', async (req: AuthRequest, res, next) => {
   try {
     const existing = await prisma.user.findUnique({
       where: { id: req.params.id },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, role: true, isBlocked: true },
     });
     if (!existing) throw new AppError(404, 'Пользователь не найден');
-    await logAction(req, 'IMPERSONATE', existing.id, `Просмотр аккаунта: ${existing.email}`);
-    res.json({ ok: true, user: existing });
+    if (existing.isBlocked) throw new AppError(403, 'Аккаунт пользователя заблокирован');
+    // Short-lived login token (15 min): the admin opens it in a separate
+    // page/tab and works as that user. Every issuance is audit-logged.
+    const token = signToken({ userId: existing.id }, '15m');
+    await logAction(req, 'IMPERSONATE_LOGIN', existing.id, `Вход в аккаунт: ${existing.email}`);
+    res.json({ ok: true, user: existing, token });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- User forensics: what happened to this user's tasks? ---
+// Answers: completed by whom/when, deleted when, recurring state,
+// pending reminders, admin actions on this user. Read-only.
+router.get('/users/:id/forensics', async (req: AuthRequest, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, email: true, name: true, role: true, isBlocked: true, lastActiveAt: true, createdAt: true },
+    });
+    if (!user) throw new AppError(404, 'Пользователь не найден');
+
+    const [counts, recentCompleted, recentDeleted, recurring, pendingReminders, adminActions] =
+      await Promise.all([
+        Promise.all([
+          prisma.task.count({ where: { creatorId: user.id, isDeleted: false, status: { not: 'COMPLETED' } } }),
+          prisma.task.count({ where: { creatorId: user.id, status: 'COMPLETED' } }),
+          prisma.task.count({ where: { creatorId: user.id, isDeleted: true } }),
+          prisma.task.count({ where: { creatorId: user.id, isDeleted: false, recurrenceType: { not: 'NONE' } } }),
+          prisma.reminder.count({ where: { task: { creatorId: user.id }, isSent: false } }),
+        ]),
+        prisma.task.findMany({
+          where: { creatorId: user.id, status: 'COMPLETED' },
+          select: { id: true, title: true, status: true, completedAt: true, updatedAt: true, dueDate: true, startDate: true, recurrenceType: true },
+          orderBy: { completedAt: 'desc' },
+          take: 20,
+        }),
+        prisma.task.findMany({
+          where: { creatorId: user.id, isDeleted: true },
+          select: { id: true, title: true, status: true, deletedAt: true, updatedAt: true, dueDate: true, startDate: true, recurrenceType: true },
+          orderBy: { deletedAt: 'desc' },
+          take: 20,
+        }),
+        prisma.task.findMany({
+          where: { creatorId: user.id, isDeleted: false, recurrenceType: { not: 'NONE' } },
+          select: { id: true, title: true, status: true, recurrenceType: true, recurrenceRule: true, updatedAt: true, dueDate: true, startDate: true },
+          orderBy: { updatedAt: 'desc' },
+          take: 50,
+        }),
+        prisma.reminder.findMany({
+          where: { task: { creatorId: user.id }, isSent: false },
+          select: { id: true, remindAt: true, task: { select: { id: true, title: true } } },
+          orderBy: { remindAt: 'asc' },
+          take: 20,
+        }),
+        prisma.adminLog.findMany({
+          where: { targetUserId: user.id },
+          select: { id: true, action: true, description: true, adminEmail: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        }),
+      ]);
+
+    res.json({
+      user,
+      counts: {
+        active: counts[0],
+        completed: counts[1],
+        deleted: counts[2],
+        recurring: counts[3],
+        pendingReminders: counts[4],
+      },
+      recentCompleted,
+      recentDeleted,
+      recurring,
+      pendingReminders,
+      adminActions,
+    });
   } catch (err) {
     next(err);
   }

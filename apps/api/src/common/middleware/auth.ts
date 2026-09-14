@@ -39,6 +39,9 @@ export async function maintenanceGate(req: AuthRequest, _res: Response, next: Ne
     if (!req.userId) {
       return next(new AppError(401, 'Требуется авторизация'));
     }
+    // Admins keep working during maintenance: they must be able to verify
+    // the app state and turn maintenance off. Everyone else gets 503.
+    if (req.userRole === 'ADMIN') return next();
     const maintenance = await isMaintenanceOn();
     if (maintenance.enabled) {
       return next(new AppError(503, maintenance.message, 'MAINTENANCE'));

@@ -138,7 +138,9 @@ export function BirthdaysView() {
               <button
                 type="button"
                 className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
-                onClick={() => remove(b.id)}
+                onClick={() => {
+                  if (confirm(`Удалить день рождения «${b.name}»?`)) remove(b.id);
+                }}
               >
                 <Trash2 className="h-4 w-4" />
               </button>

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { api } from "@/lib/api";
+import { isRecurring } from "@/lib/recurrence";
 
 interface Task {
   id: string;
@@ -551,10 +552,30 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       await get().skipOccurrence(baseId, dateKey);
       return;
     }
+    // Completing a recurring SERIES checks off only today's occurrence.
+    // Completing the series itself would vanish it from every view (the
+    // server excludes COMPLETED series) with no way back.
+    if (typeof id === 'string') {
+      const base =
+        get().recurringTasks.find((item) => item.id === id) ??
+        get().tasks.find((item) => item.id === id) ??
+        get().todayTasks.find((item) => item.id === id);
+      if (base && isRecurring(base)) {
+        const now = new Date();
+        const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+          now.getDate()
+        ).padStart(2, '0')}`;
+        await get().skipOccurrence(id, key);
+        return;
+      }
+    }
     const current =
       get().tasks.find((item) => item.id === id) ??
       get().todayTasks.find((item) => item.id === id);
     const optimisticStatus = current?.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
+    // Remember visibility: a just-completed task must stay visible (checked),
+    // not vanish — list endpoints exclude COMPLETED rows.
+    const wasVisible = get().tasks.some((item) => item.id === id);
 
     set((state) => ({
       tasks: state.tasks.map((item) => (item.id === id ? { ...item, status: optimisticStatus } : item)),
@@ -582,6 +603,17 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     }
 
     await get().refreshCurrentView({ silent: true }).catch(() => {});
+    if (optimisticStatus === 'COMPLETED' && wasVisible) {
+      const st = get();
+      if (!st.tasks.some((item) => item.id === id)) {
+        const completedTask = {
+          ...(current ?? { id }),
+          status: 'COMPLETED',
+          completedAt: new Date().toISOString(),
+        } as Task;
+        set({ tasks: [...st.tasks, completedTask] });
+      }
+    }
   },
 
   deleteTask: async (id) => {

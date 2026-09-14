@@ -73,20 +73,34 @@ export default function AppPage() {
 
   useEffect(() => {
     let alive = true;
-    api
-      .systemStatus()
-      .then((s) => {
-        if (!alive) return;
-        if (s.maintenance.enabled) {
-          useAuthStore.setState({ maintenance: { message: s.maintenance.message } });
-        } else {
-          api.clearMaintenanceKnown();
-          useAuthStore.setState({ maintenance: null });
-        }
-      })
-      .catch(() => {});
+    // Re-checked periodically: without this the app stays on the
+    // maintenance screen (and workers stay paused) forever after the
+    // backend maintenance ends, until a full reload.
+    const checkStatus = () => {
+      api
+        .systemStatus()
+        .then((s) => {
+          if (!alive) return;
+          if (s.maintenance.enabled) {
+            useAuthStore.setState({ maintenance: { message: s.maintenance.message } });
+          } else {
+            const wasMaintenance =
+              api.isMaintenanceKnown() || useAuthStore.getState().maintenance !== null;
+            api.clearMaintenanceKnown();
+            useAuthStore.setState({ maintenance: null });
+            if (wasMaintenance) {
+              // Just recovered: refetch so lists don't stay empty/stale.
+              useTasksStore.getState().refreshCurrentView({ silent: true }).catch(() => {});
+            }
+          }
+        })
+        .catch(() => {});
+    };
+    checkStatus();
+    const id = setInterval(checkStatus, 30000);
     return () => {
       alive = false;
+      clearInterval(id);
     };
   }, []);
 

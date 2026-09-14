@@ -504,10 +504,22 @@ class ApiClient {
   }
 
   adminImpersonate(id: string) {
-    return this.request<{ ok: boolean; user: any }>(`/admin/users/${id}/impersonate`, {
+    return this.request<{ ok: boolean; user: any; token: string }>(`/admin/users/${id}/impersonate`, {
       method: 'POST',
       body: JSON.stringify({}),
     });
+  }
+
+  adminUserForensics(id: string) {
+    return this.request<{
+      user: any;
+      counts: { active: number; completed: number; deleted: number; recurring: number; pendingReminders: number };
+      recentCompleted: any[];
+      recentDeleted: any[];
+      recurring: any[];
+      pendingReminders: any[];
+      adminActions: any[];
+    }>(`/admin/users/${id}/forensics`);
   }
 
   adminErrors(params?: Record<string, string>) {
