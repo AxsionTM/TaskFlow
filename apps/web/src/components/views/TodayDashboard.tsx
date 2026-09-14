@@ -68,13 +68,21 @@ export function TodayDashboard() {
     // Union of every loaded list (like the agenda does): a task that is
     // relevant today must show here even if one endpoint missed it.
     // Completed-today tasks are kept visible (checked), not dropped.
+    // Order: by start time ascending (06:00 → 23:00), undated last.
     const merged = mergeWithOccurrences([...todayTasks, ...tasks], recurringTasks, dayKey, dayKey);
     const seen = new Set<string>();
-    return merged.filter((t: any) => {
-      if (!t || seen.has(t.id)) return false;
-      seen.add(t.id);
-      return matchesTodayFilter(t);
-    });
+    const timeOf = (t: any) => {
+      const raw = t.startDate || t.dueDate;
+      const ms = raw ? new Date(raw).getTime() : NaN;
+      return Number.isNaN(ms) ? Infinity : ms;
+    };
+    return merged
+      .filter((t: any) => {
+        if (!t || seen.has(t.id)) return false;
+        seen.add(t.id);
+        return matchesTodayFilter(t);
+      })
+      .sort((a: any, b: any) => timeOf(a) - timeOf(b));
   }, [todayTasks, tasks, recurringTasks]);
 
   const taskScore = (t: any): number => {
